@@ -57,7 +57,7 @@ namespace Breakdown
         protected InstanceID lastInstance;
         //protected bool[] showRouteTypes;
         protected int lastPathCount = 0;
-        public FieldInfo mPathsInfo, mInstanceInfo;
+        public FieldInfo mPathsInfo;
         protected Dictionary<string, UIBreakdownPanel> panels = new Dictionary<string, UIBreakdownPanel>();
         protected bool districtsNotSegments = true;
 
@@ -65,11 +65,8 @@ namespace Breakdown
         {
             Log.Info("BreakdownThread created.");
             this.mPathsInfo = typeof(PathVisualizer).GetField("m_paths", BindingFlags.NonPublic | BindingFlags.Instance);
-            this.mInstanceInfo = typeof(PathVisualizer).GetField("m_lastInstance", BindingFlags.NonPublic | BindingFlags.Instance);
             if (this.mPathsInfo == null)
                 Log.Info("Can't get m_paths from PathVisualizer.");
-            if (this.mInstanceInfo == null)
-                Log.Info("Can't get m_lastInstance from PathVisualizer.");
         }
 
         private bool _pathsVisibleLogged = false;
@@ -77,7 +74,7 @@ namespace Breakdown
         public override void OnUpdate(float realTimeDelta, float simulationTimeDelta)
         {
             var viz = Singleton<PathVisualizer>.instance; // TODO should we be checking "exists" instead of checking instance for null?
-            if (viz == null || !viz.PathsVisible || this.mPathsInfo == null || this.mInstanceInfo == null)
+            if (viz == null || !viz.PathsVisible || this.mPathsInfo == null)
             {
                 _pathsVisibleLogged = false;
                 foreach (var panel in this.panels.Values)
@@ -93,7 +90,7 @@ namespace Breakdown
                 if (!_pathsVisibleLogged)
                 {
                     _pathsVisibleLogged = true;
-                    Log.Info($"PathsVisible=true, panels={panels.Count}, mPathsInfo={mPathsInfo != null}, mInstanceInfo={mInstanceInfo != null}");
+                    Log.Info($"PathsVisible=true, panels={panels.Count}, mPathsInfo={mPathsInfo != null}");
                 }
                 if (this.panels.Count == 0)
                 {
@@ -123,7 +120,7 @@ namespace Breakdown
                         this.lastRefreshFrame = -6; // give it 1/10th second to settle - avoids a double update when changing targets.
                     }
                 }
-                var instance = (InstanceID)this.mInstanceInfo.GetValue(viz);
+                var instance = InstanceManager.instance.GetSelectedInstance();
                 if (instance != this.lastInstance)
                 {
                     this.lastInstance = instance;
