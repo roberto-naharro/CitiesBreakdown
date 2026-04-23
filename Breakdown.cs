@@ -62,6 +62,10 @@ namespace Breakdown
         private readonly Dictionary<string, Color32> _districtColors = new Dictionary<string, Color32>();
         private int _nextColorIndex = 0;
 
+        private volatile bool _findRoutesPending = false;
+        private volatile bool _pendingResultReady = false;
+        private Action _pendingUIUpdate;
+
         public BreakdownThread()
         {
             Log.Info("BreakdownThread created.");
@@ -144,6 +148,14 @@ namespace Breakdown
                 //}
                 var paths = this.mPathsInfo.GetValue(viz) as Dictionary<InstanceID, PathVisualizer.Path>;
                 if (paths == null) return;
+
+                if (_pendingResultReady)
+                {
+                    _pendingResultReady = false;
+                    if (_pendingUIUpdate != null) _pendingUIUpdate();
+                    _findRoutesPending = false;
+                }
+
                 var instance = InstanceManager.instance.GetSelectedInstance();
                 if (instance != this.lastInstance)
                 {
@@ -155,9 +167,11 @@ namespace Breakdown
                     }
                     this.lastRefreshFrame = 0;
                 }
-                if (this.lastRefreshFrame++ % 60 == 0)
+                if (this.lastRefreshFrame++ % 60 == 0 && !_findRoutesPending)
                 {
-                    this.FindRoutes(paths);
+                    var capturedInstance = instance;
+                    _findRoutesPending = true;
+                    SimulationManager.instance.AddAction(FindRoutesCoroutine(paths, capturedInstance));
                 }
             }
             base.OnUpdate(realTimeDelta, simulationTimeDelta);
@@ -225,20 +239,12 @@ namespace Breakdown
             Log.Debug($"InitUI done, {panels.Count} panels attached.");
         }
 
-        public void FindRoutes(Dictionary<InstanceID, PathVisualizer.Path> pathDict)
+        private IEnumerator<bool> FindRoutesCoroutine(Dictionary<InstanceID, PathVisualizer.Path> pathDict, InstanceID instance)
         {
-            if (pathDict == null)
-            {
-                return;
-            }
+            if (pathDict == null) { _findRoutesPending = false; yield break; }
 
-            //UnityEngine.Debug.Log($"{PathManager.instance.m_pathUnitCount}");
             var pathBuffer = PathManager.instance?.m_pathUnits?.m_buffer;
-
-            if (pathBuffer == null)
-            {
-                return;
-            }
+            if (pathBuffer == null) { _findRoutesPending = false; yield break; }
 
             int bufferSize = (int)PathManager.instance.m_pathUnits.m_size;
             this.pathCounts.Clear();  // TODO option to aggregate results.
@@ -246,7 +252,6 @@ namespace Breakdown
             sw.Start();
 
             var tails = pathBuffer.GetPathTails(bufferSize);
-            //UnityEngine.Debug.Log($"{tails.Keys.Count}, {actualTails}, {dups}, {sw.ElapsedMilliseconds}");
 
             HashSet<uint> heads;
             try
@@ -258,7 +263,8 @@ namespace Breakdown
             }
             catch (InvalidOperationException)
             {
-                return;
+                _findRoutesPending = false;
+                yield break;
             }
 
             Log.Debug($"FindRoutes tails={tails.Count} heads={heads.Count} pathDict={pathDict.Count} elapsed={sw.ElapsedMilliseconds}ms");
@@ -267,7 +273,6 @@ namespace Breakdown
 
             sw.Reset();
             sw.Start();
-            var instance = InstanceManager.instance.GetSelectedInstance();
             bool showCount = instance.Type != InstanceType.Vehicle && instance.Type != InstanceType.Citizen;
             string selectedDistrict = GetSelectedDistrict(instance);
 
@@ -309,13 +314,19 @@ namespace Breakdown
             var tags   = ranked.Select(x => SameTag(x.from, x.to)).ToArray();
             var counts = ranked.Select(x => showCount ? x.FormatCount() : string.Empty).ToArray();
             Log.Debug($"built {froms.Length} display entries in {sw.ElapsedMilliseconds}ms");
-            foreach (var panel in panels.Values)
+
+            _pendingUIUpdate = () =>
             {
-                if (panel != null)
+                foreach (var panel in this.panels.Values)
                 {
-                    panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowShowBoth);
+                    if (panel != null)
+                    {
+                        panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowShowBoth);
+                    }
                 }
-            }
+            };
+            _pendingResultReady = true;
+            yield break;
         }
 
         private readonly HashSet<uint> _loopCheckBuffer = new HashSet<uint>();
