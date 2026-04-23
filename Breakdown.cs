@@ -151,7 +151,7 @@ namespace Breakdown
                     //UnityEngine.Debug.Log($"new instance on {lastRefreshFrame}.");
                     foreach (var panel in this.panels.Values)
                     {
-                        panel.SetTopTen(new string[0], new Color32[0], new string[0], new Color32[0], new bool[0], new string[0], false);
+                        panel.SetTopTen(new string[0], new Color32[0], new string[0], new Color32[0], new string[0], new string[0], false);
                     }
                     this.lastRefreshFrame = 0;
                 }
@@ -280,14 +280,15 @@ namespace Breakdown
             var fromColors = ranked.Select(x => this.GetDistrictColor(x.from)).ToArray();
             var tos = ranked.Select(x => x.to).ToArray();
             var toColors = ranked.Select(x => this.GetDistrictColor(x.to)).ToArray();
-            var sameDistrict = ranked.Select(x => x.from == x.to).ToArray();
-            var counts = ranked.Select(x => x.FormatCount()).ToArray();
+            var tags = ranked.Select(x => SameTag(x.from, x.to)).ToArray();
+            bool showCount = instance.Type != InstanceType.Vehicle && instance.Type != InstanceType.Citizen;
+            var counts = ranked.Select(x => showCount ? x.FormatCount() : string.Empty).ToArray();
             Log.Debug($"ranked {ranked.Length} OD pairs, top {froms.Length} messages built in {sw.ElapsedMilliseconds}ms");
             foreach (var panel in panels.Values)
             {
                 if (panel != null)
                 {
-                    panel.SetTopTen(froms, fromColors, tos, toColors, sameDistrict, counts, showBoth);
+                    panel.SetTopTen(froms, fromColors, tos, toColors, tags, counts, showBoth);
                 }
             }
         }
@@ -383,6 +384,13 @@ namespace Breakdown
                     yield return new PathCount() { from = fromCount.Key, to = toCount.Key, count = toCount.Value };
                 }
             }
+        }
+
+        private static string SameTag(string from, string to)
+        {
+            if (from != to) return null;
+            if (from == "Out of town" || from == "No district") return null;
+            return "(same district)";
         }
 
         private static int RoutePriority(string from, string to)

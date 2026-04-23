@@ -69,26 +69,31 @@ namespace Breakdown
         }
 
         public void SetTopTen(string[] froms, Color32[] fromColors, string[] tos, Color32[] toColors,
-            bool[] sameDistrict, string[] counts, bool showBoth)
+            string[] tags, string[] counts, bool showBoth)
         {
             if (_rows == null) return;
             for (int i = 0; i < RowCount; i++)
             {
                 if (i < froms.Length)
                 {
-                    bool same = sameDistrict[i];
+                    bool hasTag = tags[i] != null;
                     _fromLabels[i].text = froms[i];
                     _fromLabels[i].textColor = fromColors[i];
-                    _tagLabels[i].textColor = fromColors[i];
-                    _tagLabels[i].isVisible = same;
-                    _arrowLabels[i].isVisible = showBoth && !same;
-                    _toLabels[i].isVisible = showBoth && !same;
-                    if (showBoth && !same)
+                    if (hasTag)
+                    {
+                        _tagLabels[i].text = tags[i];
+                        _tagLabels[i].textColor = fromColors[i];
+                    }
+                    _tagLabels[i].isVisible = hasTag;
+                    _arrowLabels[i].isVisible = showBoth && !hasTag;
+                    _toLabels[i].isVisible = showBoth && !hasTag;
+                    if (showBoth && !hasTag)
                     {
                         _toLabels[i].text = tos[i];
                         _toLabels[i].textColor = toColors[i];
                     }
                     _countLabels[i].text = counts[i];
+                    _countLabels[i].isVisible = counts[i] != string.Empty;
                     _rows[i].isVisible = true;
                 }
                 else
