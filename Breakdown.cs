@@ -110,7 +110,8 @@ namespace Breakdown
                 //    showRouteTypes = flags;
                 //    lastRefreshFrame = 0;
                 //}
-                var paths = (Dictionary<InstanceID, PathVisualizer.Path>)this.mPathsInfo.GetValue(viz);
+                var paths = this.mPathsInfo.GetValue(viz) as Dictionary<InstanceID, PathVisualizer.Path>;
+                if (paths == null) return;
                 if (paths.Count != this.lastPathCount)
                 {
                     this.lastPathCount = paths.Count;
@@ -228,11 +229,16 @@ namespace Breakdown
             //UnityEngine.Debug.Log($"{tails.Keys.Count}, {actualTails}, {dups}, {sw.ElapsedMilliseconds}");
 
             HashSet<uint> heads;
-            // FIXME pathDict belongs to the Visualizer, is private and isn't thread safe.  It's almost certainly being updated in another thread.  Occasionaly we get a sync error here.
-            // I don't think the lock() will actually fix that but it's worth a try.  Should probably just try/catch{return} instead.
-            lock (pathDict)
+            try
             {
-                heads = new HashSet<uint>(pathDict.Select(x => x.Value.m_pathUnit).Select(x => GetHead(x, tails)));
+                lock (pathDict)
+                {
+                    heads = new HashSet<uint>(pathDict.Select(x => x.Value.m_pathUnit).Select(x => GetHead(x, tails)));
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                return;
             }
 
             Log.Debug($"FindRoutes tails={tails.Count} heads={heads.Count} pathDict={pathDict.Count} elapsed={sw.ElapsedMilliseconds}ms");
