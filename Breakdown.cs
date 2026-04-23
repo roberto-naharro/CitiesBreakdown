@@ -56,7 +56,6 @@ namespace Breakdown
         public int lastRefreshFrame = 0;
         protected InstanceID lastInstance;
         //protected bool[] showRouteTypes;
-        protected int lastPathCount = 0;
         public FieldInfo mPathsInfo;
         protected Dictionary<string, UIBreakdownPanel> panels = new Dictionary<string, UIBreakdownPanel>();
         protected bool districtsNotSegments = true;
@@ -112,15 +111,6 @@ namespace Breakdown
                 //}
                 var paths = this.mPathsInfo.GetValue(viz) as Dictionary<InstanceID, PathVisualizer.Path>;
                 if (paths == null) return;
-                if (paths.Count != this.lastPathCount)
-                {
-                    this.lastPathCount = paths.Count;
-                    //UnityEngine.Debug.Log($"new path count on {lastRefreshFrame}.");
-                    if (this.lastRefreshFrame > 0)
-                    {
-                        this.lastRefreshFrame = -6; // give it 1/10th second to settle - avoids a double update when changing targets.
-                    }
-                }
                 var instance = InstanceManager.instance.GetSelectedInstance();
                 if (instance != this.lastInstance)
                 {
