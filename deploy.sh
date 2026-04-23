@@ -28,7 +28,7 @@ if [[ "${1:-}" == "--release" ]]; then
     CONFIGURATION="Release"
 fi
 
-MOD_NAME="Breakdown"
+MOD_NAME="BreakdownRevisited"
 BUILD_OUT="$SCRIPT_DIR/bin/$CONFIGURATION"
 DIST="$SCRIPT_DIR/dist/$MOD_NAME"
 

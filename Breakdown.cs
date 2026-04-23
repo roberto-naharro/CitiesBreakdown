@@ -1,6 +1,7 @@
 ﻿using ColossalFramework;
 using ColossalFramework.UI;
 using ICities;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -11,15 +12,39 @@ namespace Breakdown
 {
     public class BreakdownMod : IUserMod
     {
+#if DEBUG
+        public static bool DebugLog = true;
+#else
         public static bool DebugLog = false;
+#endif
 
-        public string Name { get { return "Breakdown"; } }
+        public string Name { get { return "Breakdown Revisited"; } }
 
         public string Description { get { return "Shows more route details when viewing routes."; } }
 
+        public void OnEnabled()
+        {
+            Log.Info("Mod enabled.");
+        }
+
+        public void OnDisabled()
+        {
+            Log.Info("Mod disabled.");
+        }
+
         public void OnSettingsUI(UIHelperBase helper)
         {
-            helper.AddCheckbox("Debug logging", DebugLog, value => { DebugLog = value; });
+            Log.Info("OnSettingsUI called.");
+            try
+            {
+                UIHelperBase group = helper.AddGroup("Breakdown");
+                group.AddCheckbox("Debug logging", DebugLog, (bool value) => { DebugLog = value; });
+                Log.Info("OnSettingsUI completed.");
+            }
+            catch (Exception ex)
+            {
+                Log.Info($"OnSettingsUI failed: {ex.Message}");
+            }
         }
     }
 
@@ -38,6 +63,7 @@ namespace Breakdown
 
         public BreakdownThread()
         {
+            Log.Info("BreakdownThread created.");
             this.mPathsInfo = typeof(PathVisualizer).GetField("m_paths", BindingFlags.NonPublic | BindingFlags.Instance);
             this.mInstanceInfo = typeof(PathVisualizer).GetField("m_lastInstance", BindingFlags.NonPublic | BindingFlags.Instance);
             if (this.mPathsInfo == null)
@@ -67,7 +93,7 @@ namespace Breakdown
                 if (!_pathsVisibleLogged)
                 {
                     _pathsVisibleLogged = true;
-                    Log.Debug($"PathsVisible=true, panels={panels.Count}, mPathsInfo={mPathsInfo != null}, mInstanceInfo={mInstanceInfo != null}");
+                    Log.Info($"PathsVisible=true, panels={panels.Count}, mPathsInfo={mPathsInfo != null}, mInstanceInfo={mInstanceInfo != null}");
                 }
                 if (this.panels.Count == 0)
                 {
@@ -122,7 +148,7 @@ namespace Breakdown
             {
                 if (panel != null)
                 {
-                    Object.Destroy(panel);
+                    UnityEngine.Object.Destroy(panel);
                 }
             }
             this.panels.Clear();

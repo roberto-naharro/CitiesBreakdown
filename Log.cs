@@ -2,7 +2,7 @@ namespace Breakdown
 {
     internal static class Log
     {
-        private const string Prefix = "[Breakdown] ";
+        private const string Prefix = "[BreakdownRevisited] ";
 
         internal static void Info(string message)
             => UnityEngine.Debug.Log(Prefix + message);
