@@ -24,10 +24,11 @@ namespace Breakdown
             foreach (var label in this.topTen)
             {
                 label.padding = new RectOffset(5, 5, 5, 5);
+                label.textColor = new Color32(0, 0, 0, 255);
             }
         }
 
-        public void SetTopTen(string[] messages)
+        public void SetTopTen(string[] messages, Color32[] colors)
         {
             if (this.topTen == null)
             {
@@ -36,6 +37,7 @@ namespace Breakdown
             for (int i = 0; i < this.topTen.Length; i++)
             {
                 this.topTen[i].text = i < messages.Length ? messages[i] : string.Empty;
+                this.topTen[i].textColor = i < colors.Length ? colors[i] : new Color32(0, 0, 0, 255);
             }
         }
     }

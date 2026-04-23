@@ -60,12 +60,53 @@ namespace Breakdown
         protected Dictionary<string, UIBreakdownPanel> panels = new Dictionary<string, UIBreakdownPanel>();
         protected bool districtsNotSegments = true;
 
+        private readonly Dictionary<string, Color32> _districtColors = new Dictionary<string, Color32>();
+        private int _nextColorIndex = 0;
+
         public BreakdownThread()
         {
             Log.Info("BreakdownThread created.");
             this.mPathsInfo = typeof(PathVisualizer).GetField("m_paths", BindingFlags.NonPublic | BindingFlags.Instance);
             if (this.mPathsInfo == null)
                 Log.Info("Can't get m_paths from PathVisualizer.");
+        }
+
+        private Color32 GetDistrictColor(string name)
+        {
+            if (name == "Out of town")
+                return new Color32(255, 255, 255, 255);
+            if (name == "No district")
+                return new Color32(120, 120, 120, 255);
+            Color32 color;
+            if (!_districtColors.TryGetValue(name, out color))
+            {
+                float hue = (_nextColorIndex * 0.618033988f) % 1f;
+                _nextColorIndex++;
+                color = HsvToColor32(hue, 0.80f, 0.62f);
+                _districtColors[name] = color;
+            }
+            return color;
+        }
+
+        private static Color32 HsvToColor32(float h, float s, float v)
+        {
+            float sector = h * 6f;
+            int hi = (int)sector % 6;
+            float f = sector - (int)sector;
+            float p = v * (1f - s);
+            float q = v * (1f - f * s);
+            float t = v * (1f - (1f - f) * s);
+            float r, g, b;
+            switch (hi)
+            {
+                case 0:  r = v; g = t; b = p; break;
+                case 1:  r = q; g = v; b = p; break;
+                case 2:  r = p; g = v; b = t; break;
+                case 3:  r = p; g = q; b = v; break;
+                case 4:  r = t; g = p; b = v; break;
+                default: r = v; g = p; b = q; break;
+            }
+            return new Color32((byte)(r * 255f), (byte)(g * 255f), (byte)(b * 255f), 255);
         }
 
         private bool _pathsVisibleLogged = false;
@@ -115,7 +156,7 @@ namespace Breakdown
                     //UnityEngine.Debug.Log($"new instance on {lastRefreshFrame}.");
                     foreach (var panel in this.panels.Values)
                     {
-                        panel.SetTopTen(new string[0]);
+                        panel.SetTopTen(new string[0], new Color32[0]);
                     }
                     this.lastRefreshFrame = 0;
                 }
@@ -231,14 +272,15 @@ namespace Breakdown
 
             sw.Reset();
             sw.Start();
-            var pcs = this.GetPathCounts();
-            var messages = pcs.OrderByDescending(x => x.count.refs).Take(10).Select(x => x.Format()).ToArray();
-            Log.Debug($"ranked {pcs.Count()} OD pairs, top {messages.Length} messages built in {sw.ElapsedMilliseconds}ms");
+            var ranked = this.GetPathCounts().OrderByDescending(x => x.count.refs).Take(10).ToArray();
+            var messages = ranked.Select(x => x.Format()).ToArray();
+            var colors = ranked.Select(x => this.GetDistrictColor(x.from)).ToArray();
+            Log.Debug($"ranked {ranked.Length} OD pairs, top {messages.Length} messages built in {sw.ElapsedMilliseconds}ms");
             foreach (var panel in panels.Values)
             {
                 if (panel != null)
                 {
-                    panel.SetTopTen(messages);
+                    panel.SetTopTen(messages, colors);
                 }
             }
             var message = string.Join("\n", messages);
@@ -376,7 +418,7 @@ namespace Breakdown
         public string Format()
         {
             var routeLabel = this.count.refs == 1 ? "route" : "routes";
-            return $"{this.from} to {this.to} ({this.count.refs} {routeLabel})\n";
+            return $"{this.from} to {this.to} ({this.count.refs} {routeLabel})";
         }
     }
 
