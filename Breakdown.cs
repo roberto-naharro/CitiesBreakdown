@@ -136,10 +136,6 @@ namespace Breakdown
                 {
                     this.InitUI();
                 }
-                foreach (var panel in this.panels.Values)
-                {
-                    panel.Show();
-                }
                 //var flags = new[] { viz.showCityServiceVehicles, viz.showCyclists, viz.showPedestrians, viz.showPrivateVehicles, viz.showPublicTransport, viz.showTrucks };
                 //if (showRouteTypes == null || !Enumerable.SequenceEqual(showRouteTypes, flags))
                 //{

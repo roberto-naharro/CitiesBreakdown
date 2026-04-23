@@ -73,6 +73,7 @@ namespace Breakdown
                     _rows[i].isVisible = false;
                 }
             }
+            this.isVisible = names.Length > 0;
         }
     }
 }
