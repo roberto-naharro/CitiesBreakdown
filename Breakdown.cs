@@ -52,7 +52,6 @@ namespace Breakdown
     {
         // TODO implement an 'accumulate' button to gather stats. (that's why pathCounts is here, not in FindRoutes).
         public Dictionary<string, Dictionary<string, PathDetails>> pathCounts = new Dictionary<string, Dictionary<string, PathDetails>>();
-        public string lastMessage = string.Empty;
         public int lastRefreshFrame = 0;
         protected InstanceID lastInstance;
         //protected bool[] showRouteTypes;
@@ -76,13 +75,13 @@ namespace Breakdown
             if (name == "Out of town")
                 return new Color32(255, 255, 255, 255);
             if (name == "No district")
-                return new Color32(120, 120, 120, 255);
+                return new Color32(180, 180, 180, 255);
             Color32 color;
             if (!_districtColors.TryGetValue(name, out color))
             {
                 float hue = (_nextColorIndex * 0.618033988f) % 1f;
                 _nextColorIndex++;
-                color = HsvToColor32(hue, 0.80f, 0.62f);
+                color = HsvToColor32(hue, 0.65f, 0.95f);
                 _districtColors[name] = color;
             }
             return color;
@@ -156,7 +155,7 @@ namespace Breakdown
                     //UnityEngine.Debug.Log($"new instance on {lastRefreshFrame}.");
                     foreach (var panel in this.panels.Values)
                     {
-                        panel.SetTopTen(new string[0], new Color32[0]);
+                        panel.SetTopTen(new string[0], new Color32[0], new bool[0], new string[0]);
                     }
                     this.lastRefreshFrame = 0;
                 }
@@ -272,31 +271,22 @@ namespace Breakdown
 
             sw.Reset();
             sw.Start();
-            var ranked = this.GetPathCounts().OrderByDescending(x => x.count.refs).Take(10).ToArray();
-            var messages = ranked.Select(x => x.Format()).ToArray();
+            var ranked = this.GetPathCounts()
+                .OrderBy(x => RoutePriority(x.from, x.to))
+                .ThenByDescending(x => x.count.refs)
+                .Take(10)
+                .ToArray();
+            var names = ranked.Select(x => x.from).ToArray();
             var colors = ranked.Select(x => this.GetDistrictColor(x.from)).ToArray();
-            Log.Debug($"ranked {ranked.Length} OD pairs, top {messages.Length} messages built in {sw.ElapsedMilliseconds}ms");
+            var sameDistrict = ranked.Select(x => x.from == x.to).ToArray();
+            var counts = ranked.Select(x => x.FormatCount()).ToArray();
+            Log.Debug($"ranked {ranked.Length} OD pairs, top {names.Length} messages built in {sw.ElapsedMilliseconds}ms");
             foreach (var panel in panels.Values)
             {
                 if (panel != null)
                 {
-                    panel.SetTopTen(messages, colors);
+                    panel.SetTopTen(names, colors, sameDistrict, counts);
                 }
-            }
-            var message = string.Join("\n", messages);
-            if (message == string.Empty)
-            {
-                //UnityEngine.Debug.Log("Nothing to say.");
-            }
-            else if (message == lastMessage)
-            {
-                //UnityEngine.Debug.Log("Nothing new to say.");
-            }
-            //else if (lastRefreshFrame % 180 == 1)
-            else
-            {
-                //UnityEngine.Debug.Log("\n" + message);
-                lastMessage = message;
             }
         }
 
@@ -391,6 +381,13 @@ namespace Breakdown
             }
         }
 
+        private static int RoutePriority(string from, string to)
+        {
+            if (from == "Out of town" || to == "Out of town") return 0;
+            if (from == "No district" || to == "No district") return 1;
+            return 2;
+        }
+
         private static uint GetHead(uint start, Dictionary<uint, uint> tails)
         {
             var loopCheck = new HashSet<uint>();
@@ -415,10 +412,10 @@ namespace Breakdown
             return $"{this.count.refs} : {this.from} -> {this.to}";
         }
 
-        public string Format()
+        public string FormatCount()
         {
             var routeLabel = this.count.refs == 1 ? "route" : "routes";
-            return $"{this.from} to {this.to} ({this.count.refs} {routeLabel})";
+            return $"({this.count.refs} {routeLabel})";
         }
     }
 

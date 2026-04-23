@@ -1,18 +1,23 @@
-﻿using ColossalFramework.UI;
-using System.Linq;
+using ColossalFramework.UI;
 using UnityEngine;
 
 namespace Breakdown
 {
     public class UIBreakdownPanel : UIPanel
     {
-        public UILabel[] topTen = null;
+        private const int RowCount = 10;
+        private static readonly Color32 MutedColor = new Color32(160, 160, 160, 255);
+
+        private UIPanel[] _rows;
+        private UILabel[] _nameLabels;
+        private UILabel[] _tagLabels;
+        private UILabel[] _countLabels;
 
         public override void Start()
         {
             base.Start();
             this.backgroundSprite = "GenericPanel";
-            this.color = new Color32(254, 254, 254, 255);
+            this.color = new Color32(20, 20, 20, 210);
             this.relativePosition = new Vector3(parent.width, 0);
             this.isInteractive = false;
             this.name = "BreakdownModPanel";
@@ -20,24 +25,53 @@ namespace Breakdown
             this.autoLayoutDirection = LayoutDirection.Vertical;
             this.autoFitChildrenHorizontally = true;
             this.autoFitChildrenVertically = true;
-            this.topTen = Enumerable.Range(0, 10).Select(x => this.AddUIComponent<UILabel>()).ToArray();
-            foreach (var label in this.topTen)
+
+            _rows = new UIPanel[RowCount];
+            _nameLabels = new UILabel[RowCount];
+            _tagLabels = new UILabel[RowCount];
+            _countLabels = new UILabel[RowCount];
+
+            for (int i = 0; i < RowCount; i++)
             {
-                label.padding = new RectOffset(5, 5, 5, 5);
-                label.textColor = new Color32(0, 0, 0, 255);
+                _rows[i] = this.AddUIComponent<UIPanel>();
+                _rows[i].autoLayout = true;
+                _rows[i].autoLayoutDirection = LayoutDirection.Horizontal;
+                _rows[i].autoFitChildrenHorizontally = true;
+                _rows[i].autoFitChildrenVertically = true;
+                _rows[i].isVisible = false;
+
+                _nameLabels[i] = _rows[i].AddUIComponent<UILabel>();
+                _nameLabels[i].padding = new RectOffset(8, 4, 4, 4);
+
+                _tagLabels[i] = _rows[i].AddUIComponent<UILabel>();
+                _tagLabels[i].text = "(same district)";
+                _tagLabels[i].padding = new RectOffset(0, 4, 4, 4);
+                _tagLabels[i].isVisible = false;
+
+                _countLabels[i] = _rows[i].AddUIComponent<UILabel>();
+                _countLabels[i].textColor = MutedColor;
+                _countLabels[i].padding = new RectOffset(0, 8, 4, 4);
             }
         }
 
-        public void SetTopTen(string[] messages, Color32[] colors)
+        public void SetTopTen(string[] names, Color32[] colors, bool[] sameDistrict, string[] counts)
         {
-            if (this.topTen == null)
+            if (_rows == null) return;
+            for (int i = 0; i < RowCount; i++)
             {
-                return;
-            }
-            for (int i = 0; i < this.topTen.Length; i++)
-            {
-                this.topTen[i].text = i < messages.Length ? messages[i] : string.Empty;
-                this.topTen[i].textColor = i < colors.Length ? colors[i] : new Color32(0, 0, 0, 255);
+                if (i < names.Length)
+                {
+                    _nameLabels[i].text = names[i];
+                    _nameLabels[i].textColor = colors[i];
+                    _tagLabels[i].textColor = colors[i];
+                    _tagLabels[i].isVisible = sameDistrict[i];
+                    _countLabels[i].text = counts[i];
+                    _rows[i].isVisible = true;
+                }
+                else
+                {
+                    _rows[i].isVisible = false;
+                }
             }
         }
     }
