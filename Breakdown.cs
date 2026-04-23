@@ -89,6 +89,7 @@ namespace Breakdown
                 if (!_pathsVisibleLogged)
                 {
                     _pathsVisibleLogged = true;
+                    this.lastRefreshFrame = 0;
                     Log.Info($"PathsVisible=true, panels={panels.Count}, mPathsInfo={mPathsInfo != null}");
                 }
                 if (this.panels.Count == 0)
@@ -97,10 +98,6 @@ namespace Breakdown
                 }
                 foreach (var panel in this.panels.Values)
                 {
-                    if (!panel.enabled)
-                    {
-                        this.lastRefreshFrame = 0;
-                    }
                     panel.Show();
                 }
                 //var flags = new[] { viz.showCityServiceVehicles, viz.showCyclists, viz.showPedestrians, viz.showPrivateVehicles, viz.showPublicTransport, viz.showTrucks };
