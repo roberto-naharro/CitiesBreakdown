@@ -151,7 +151,7 @@ namespace Breakdown
                     //UnityEngine.Debug.Log($"new instance on {lastRefreshFrame}.");
                     foreach (var panel in this.panels.Values)
                     {
-                        panel.SetTopTen(new string[0], new Color32[0], new string[0], new Color32[0], new string[0], new string[0], false);
+                        panel.SetTopTen(new string[0], new string[0], new Color32[0], new string[0], new Color32[0], new string[0], new string[0], new bool[0]);
                     }
                     this.lastRefreshFrame = 0;
                 }
@@ -267,47 +267,53 @@ namespace Breakdown
 
             sw.Reset();
             sw.Start();
+            var instance = InstanceManager.instance.GetSelectedInstance();
+            bool showCount = instance.Type != InstanceType.Vehicle && instance.Type != InstanceType.Citizen;
+            string selectedDistrict = GetSelectedDistrict(instance);
+
             var ranked = this.GetPathCounts()
                 .OrderBy(x => RoutePriority(x.from, x.to))
                 .ThenByDescending(x => x.count.refs)
                 .Take(10)
                 .ToArray();
-            var instance = InstanceManager.instance.GetSelectedInstance();
-            bool showBoth = instance.Type == InstanceType.NetSegment
-                || instance.Type == InstanceType.NetNode
-                || instance.Type == InstanceType.Vehicle;
-            var froms = new string[ranked.Length];
-            var fromColors = new Color32[ranked.Length];
+
+            var prefixes    = new string[ranked.Length];
+            var froms       = new string[ranked.Length];
+            var fromColors  = new Color32[ranked.Length];
+            var tos         = new string[ranked.Length];
+            var toColors    = new Color32[ranked.Length];
+            var rowShowBoth = new bool[ranked.Length];
             for (int i = 0; i < ranked.Length; i++)
             {
                 string f = ranked[i].from, t = ranked[i].to;
-                if (!showBoth && IsSpecialDistrict(t) && !IsSpecialDistrict(f))
+                Color32 fc = this.GetDistrictColor(f), tc = this.GetDistrictColor(t);
+                if (selectedDistrict != null && t == selectedDistrict)
                 {
-                    froms[i] = "to " + t;
-                    fromColors[i] = this.GetDistrictColor(t);
+                    prefixes[i] = "from"; froms[i] = f; fromColors[i] = fc;
+                    tos[i] = t; toColors[i] = tc;
+                    rowShowBoth[i] = false;
                 }
-                else if (!showBoth && IsSpecialDistrict(f))
+                else if (selectedDistrict != null && f == selectedDistrict && t != selectedDistrict)
                 {
-                    froms[i] = "from " + f;
-                    fromColors[i] = this.GetDistrictColor(f);
+                    prefixes[i] = "to"; froms[i] = t; fromColors[i] = tc;
+                    tos[i] = f; toColors[i] = fc;
+                    rowShowBoth[i] = false;
                 }
                 else
                 {
-                    froms[i] = f;
-                    fromColors[i] = this.GetDistrictColor(f);
+                    prefixes[i] = string.Empty; froms[i] = f; fromColors[i] = fc;
+                    tos[i] = t; toColors[i] = tc;
+                    rowShowBoth[i] = true;
                 }
             }
-            var tos = ranked.Select(x => x.to).ToArray();
-            var toColors = ranked.Select(x => this.GetDistrictColor(x.to)).ToArray();
-            var tags = ranked.Select(x => SameTag(x.from, x.to)).ToArray();
-            bool showCount = instance.Type != InstanceType.Vehicle && instance.Type != InstanceType.Citizen;
+            var tags   = ranked.Select(x => SameTag(x.from, x.to)).ToArray();
             var counts = ranked.Select(x => showCount ? x.FormatCount() : string.Empty).ToArray();
-            Log.Debug($"ranked {ranked.Length} OD pairs, top {froms.Length} messages built in {sw.ElapsedMilliseconds}ms");
+            Log.Debug($"built {froms.Length} display entries in {sw.ElapsedMilliseconds}ms");
             foreach (var panel in panels.Values)
             {
                 if (panel != null)
                 {
-                    panel.SetTopTen(froms, fromColors, tos, toColors, tags, counts, showBoth);
+                    panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowShowBoth);
                 }
             }
         }
@@ -405,8 +411,14 @@ namespace Breakdown
             }
         }
 
-        private static bool IsSpecialDistrict(string name)
-            => name == "Out of town" || name == "No district";
+        private static string GetSelectedDistrict(InstanceID instance)
+        {
+            if (instance.Type == InstanceType.Building)
+                return BuildingManager.instance.m_buildings.m_buffer[instance.Building].m_position.GetDistrictName();
+            if (instance.Type == InstanceType.District)
+                return ((byte)instance.District).GetDistrictName();
+            return null;
+        }
 
         private static string SameTag(string from, string to)
         {
