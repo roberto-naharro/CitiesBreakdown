@@ -276,8 +276,27 @@ namespace Breakdown
             bool showBoth = instance.Type == InstanceType.NetSegment
                 || instance.Type == InstanceType.NetNode
                 || instance.Type == InstanceType.Vehicle;
-            var froms = ranked.Select(x => x.from).ToArray();
-            var fromColors = ranked.Select(x => this.GetDistrictColor(x.from)).ToArray();
+            var froms = new string[ranked.Length];
+            var fromColors = new Color32[ranked.Length];
+            for (int i = 0; i < ranked.Length; i++)
+            {
+                string f = ranked[i].from, t = ranked[i].to;
+                if (!showBoth && IsSpecialDistrict(t) && !IsSpecialDistrict(f))
+                {
+                    froms[i] = "to " + t;
+                    fromColors[i] = this.GetDistrictColor(t);
+                }
+                else if (!showBoth && IsSpecialDistrict(f))
+                {
+                    froms[i] = "from " + f;
+                    fromColors[i] = this.GetDistrictColor(f);
+                }
+                else
+                {
+                    froms[i] = f;
+                    fromColors[i] = this.GetDistrictColor(f);
+                }
+            }
             var tos = ranked.Select(x => x.to).ToArray();
             var toColors = ranked.Select(x => this.GetDistrictColor(x.to)).ToArray();
             var tags = ranked.Select(x => SameTag(x.from, x.to)).ToArray();
@@ -385,6 +404,9 @@ namespace Breakdown
                 }
             }
         }
+
+        private static bool IsSpecialDistrict(string name)
+            => name == "Out of town" || name == "No district";
 
         private static string SameTag(string from, string to)
         {

@@ -19,7 +19,8 @@ namespace Breakdown
         {
             base.Start();
             this.backgroundSprite = "GenericPanel";
-            this.color = new Color32(20, 20, 20, 210);
+            this.color = new Color32(20, 20, 20, 235);
+            this.isVisible = false;
             this.relativePosition = new Vector3(parent.width, 0);
             this.isInteractive = false;
             this.name = "BreakdownModPanel";
