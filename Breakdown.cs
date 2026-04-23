@@ -286,13 +286,15 @@ namespace Breakdown
             }
         }
 
+        private readonly HashSet<uint> _loopCheckBuffer = new HashSet<uint>();
+
         private void FollowRoutes(PathUnit[] pathBuffer, int bufferSize, HashSet<uint> heads, Dictionary<uint, uint> tails)
         {
             int headCount = 0;
             var sw = new Stopwatch();
             sw.Start();
             Log.Debug($"FollowRoutes scanning {bufferSize} buffer slots for {heads.Count} heads");
-            foreach (var index in Enumerable.Range(0, bufferSize))
+            for (int index = 0; index < bufferSize; index++)
             {
                 if (!heads.Contains((uint)index) || tails.ContainsKey((uint)index))
                 {
@@ -310,13 +312,13 @@ namespace Breakdown
                 ushort firstSeg, lastSeg;
                 firstSeg = path.m_position00.m_segment;
 
-                var loopCheck = new HashSet<uint>();
+                _loopCheckBuffer.Clear();
                 var unit = (uint)index;
                 float pathLength = 0;
                 ushort segmentCount = 0;
-                while (unit > 0 && !loopCheck.Contains(unit))
+                while (unit > 0 && !_loopCheckBuffer.Contains(unit))
                 {
-                    loopCheck.Add(unit);
+                    _loopCheckBuffer.Add(unit);
                     path = pathBuffer[unit];
                     unit = path.m_nextPathUnit;
                     pathLength += path.m_length;
@@ -384,13 +386,13 @@ namespace Breakdown
             return 2;
         }
 
-        private static uint GetHead(uint start, Dictionary<uint, uint> tails)
+        private uint GetHead(uint start, Dictionary<uint, uint> tails)
         {
-            var loopCheck = new HashSet<uint>();
+            _loopCheckBuffer.Clear();
             var current = start;
-            while (tails.ContainsKey(current) && !loopCheck.Contains(current))
+            while (tails.ContainsKey(current) && !_loopCheckBuffer.Contains(current))
             {
-                loopCheck.Add(current);
+                _loopCheckBuffer.Add(current);
                 current = tails[current];
             }
             return current;

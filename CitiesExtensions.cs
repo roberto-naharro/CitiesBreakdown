@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 
 namespace Breakdown
@@ -23,7 +22,7 @@ namespace Breakdown
         public static Dictionary<uint, uint> GetPathTails(this PathUnit[] pathBuffer, int bufferSize)
         {
             Dictionary<uint, uint> tails = new Dictionary<uint, uint>();
-            foreach (var index in Enumerable.Range(0, bufferSize))
+            for (int index = 0; index < bufferSize; index++)
             {
                 var path = pathBuffer[index];
                 if (path.UnusedOrEmpty())

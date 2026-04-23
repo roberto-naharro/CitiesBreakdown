@@ -18,7 +18,15 @@ namespace Breakdown
 
         public IEnumerable<T> Keys => this.Counters.Keys;
 
-        public int Total => Enumerable.Sum(this.Counters.Values.Select(x => (int)x));
+        public int Total
+        {
+            get
+            {
+                int sum = 0;
+                foreach (uint v in this.Counters.Values) sum += (int)v;
+                return sum;
+            }
+        }
 
         public override string ToString()
         {
