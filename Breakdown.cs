@@ -151,7 +151,7 @@ namespace Breakdown
                     //UnityEngine.Debug.Log($"new instance on {lastRefreshFrame}.");
                     foreach (var panel in this.panels.Values)
                     {
-                        panel.SetTopTen(new string[0], new Color32[0], new bool[0], new string[0]);
+                        panel.SetTopTen(new string[0], new Color32[0], new string[0], new Color32[0], new bool[0], new string[0], false);
                     }
                     this.lastRefreshFrame = 0;
                 }
@@ -272,16 +272,22 @@ namespace Breakdown
                 .ThenByDescending(x => x.count.refs)
                 .Take(10)
                 .ToArray();
-            var names = ranked.Select(x => x.from).ToArray();
-            var colors = ranked.Select(x => this.GetDistrictColor(x.from)).ToArray();
+            var instance = InstanceManager.instance.GetSelectedInstance();
+            bool showBoth = instance.Type == InstanceType.NetSegment
+                || instance.Type == InstanceType.NetNode
+                || instance.Type == InstanceType.Vehicle;
+            var froms = ranked.Select(x => x.from).ToArray();
+            var fromColors = ranked.Select(x => this.GetDistrictColor(x.from)).ToArray();
+            var tos = ranked.Select(x => x.to).ToArray();
+            var toColors = ranked.Select(x => this.GetDistrictColor(x.to)).ToArray();
             var sameDistrict = ranked.Select(x => x.from == x.to).ToArray();
             var counts = ranked.Select(x => x.FormatCount()).ToArray();
-            Log.Debug($"ranked {ranked.Length} OD pairs, top {names.Length} messages built in {sw.ElapsedMilliseconds}ms");
+            Log.Debug($"ranked {ranked.Length} OD pairs, top {froms.Length} messages built in {sw.ElapsedMilliseconds}ms");
             foreach (var panel in panels.Values)
             {
                 if (panel != null)
                 {
-                    panel.SetTopTen(names, colors, sameDistrict, counts);
+                    panel.SetTopTen(froms, fromColors, tos, toColors, sameDistrict, counts, showBoth);
                 }
             }
         }
