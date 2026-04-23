@@ -170,8 +170,9 @@ namespace Breakdown
                 if (this.lastRefreshFrame++ % 60 == 0 && !_findRoutesPending)
                 {
                     var capturedInstance = instance;
+                    var capturedPaths    = paths;
                     _findRoutesPending = true;
-                    SimulationManager.instance.AddAction(FindRoutesCoroutine(paths, capturedInstance));
+                    SimulationManager.instance.AddAction(() => FindRoutesOnSimThread(capturedPaths, capturedInstance));
                 }
             }
             base.OnUpdate(realTimeDelta, simulationTimeDelta);
@@ -239,12 +240,12 @@ namespace Breakdown
             Log.Debug($"InitUI done, {panels.Count} panels attached.");
         }
 
-        private IEnumerator<bool> FindRoutesCoroutine(Dictionary<InstanceID, PathVisualizer.Path> pathDict, InstanceID instance)
+        private void FindRoutesOnSimThread(Dictionary<InstanceID, PathVisualizer.Path> pathDict, InstanceID instance)
         {
-            if (pathDict == null) { _findRoutesPending = false; yield break; }
+            if (pathDict == null) { _findRoutesPending = false; return; }
 
             var pathBuffer = PathManager.instance?.m_pathUnits?.m_buffer;
-            if (pathBuffer == null) { _findRoutesPending = false; yield break; }
+            if (pathBuffer == null) { _findRoutesPending = false; return; }
 
             int bufferSize = (int)PathManager.instance.m_pathUnits.m_size;
             this.pathCounts.Clear();  // TODO option to aggregate results.
@@ -264,7 +265,7 @@ namespace Breakdown
             catch (InvalidOperationException)
             {
                 _findRoutesPending = false;
-                yield break;
+                return;
             }
 
             Log.Debug($"FindRoutes tails={tails.Count} heads={heads.Count} pathDict={pathDict.Count} elapsed={sw.ElapsedMilliseconds}ms");
@@ -326,7 +327,6 @@ namespace Breakdown
                 }
             };
             _pendingResultReady = true;
-            yield break;
         }
 
         private readonly HashSet<uint> _loopCheckBuffer = new HashSet<uint>();

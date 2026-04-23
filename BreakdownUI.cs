@@ -23,6 +23,8 @@ namespace Breakdown
             this.color = new Color32(20, 20, 20, 235);
             this.isVisible = false;
             this.relativePosition = new Vector3(parent.width, 0);
+            parent.eventSizeChanged     += (c, v) => { this.relativePosition = new Vector3(parent.width, 0); };
+            parent.eventPositionChanged += (c, v) => { this.relativePosition = new Vector3(parent.width, 0); };
             this.isInteractive = false;
             this.name = "BreakdownModPanel";
             this.autoLayout = true;
