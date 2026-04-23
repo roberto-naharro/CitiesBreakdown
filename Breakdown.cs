@@ -60,7 +60,12 @@ namespace Breakdown
         protected bool districtsNotSegments = true;
 
         private readonly Dictionary<string, Color32> _districtColors = new Dictionary<string, Color32>();
+        private readonly Dictionary<string, float>   _districtHues   = new Dictionary<string, float>();
         private int _nextColorIndex = 0;
+
+        private readonly Dictionary<ushort, string> _nearestDistrictCache = new Dictionary<ushort, string>();
+        private byte _cachedDistrictCount = 0;
+        private int  _districtCheckFrame  = 0;
 
         private volatile bool _findRoutesPending = false;
         private volatile bool _pendingResultReady = false;
@@ -83,12 +88,47 @@ namespace Breakdown
             Color32 color;
             if (!_districtColors.TryGetValue(name, out color))
             {
-                float hue = (_nextColorIndex * 0.618033988f) % 1f;
-                _nextColorIndex++;
-                color = HsvToColor32(hue, 0.65f, 0.95f);
+                bool isNear = name.StartsWith("near ");
+                string baseKey = isNear ? name.Substring(5) : name;
+                float hue;
+                if (!_districtHues.TryGetValue(baseKey, out hue))
+                {
+                    hue = (_nextColorIndex * 0.618033988f) % 1f;
+                    _nextColorIndex++;
+                    _districtHues[baseKey] = hue;
+                }
+                color = HsvToColor32(hue, isNear ? 0.35f : 0.65f, 0.95f);
                 _districtColors[name] = color;
             }
             return color;
+        }
+
+        private string ResolveDistrictName(ushort segmentId)
+        {
+            var pos = segmentId.GetSegmentLocation();
+            if (GameAreaManager.instance.PointOutOfArea(pos))
+                return "Out of town";
+            byte districtId = pos.GetDistrict();
+            if (districtId != 0)
+                return districtId.GetDistrictName();
+
+            string cached;
+            if (_nearestDistrictCache.TryGetValue(segmentId, out cached))
+                return cached;
+
+            var dm = DistrictManager.instance;
+            string nearest = null;
+            float bestDist = float.MaxValue;
+            for (int i = 1; i < 128; i++)
+            {
+                var district = dm.m_districts.m_buffer[i];
+                if ((district.m_flags & District.Flags.Created) == 0) continue;
+                float d = Vector3.Distance(pos, district.m_nameLocation);
+                if (d < bestDist) { bestDist = d; nearest = dm.GetDistrictName((byte)i); }
+            }
+            string result = nearest != null ? "near " + nearest : "No district";
+            _nearestDistrictCache[segmentId] = result;
+            return result;
         }
 
         private static Color32 HsvToColor32(float h, float s, float v)
@@ -154,6 +194,19 @@ namespace Breakdown
                     _pendingResultReady = false;
                     if (_pendingUIUpdate != null) _pendingUIUpdate();
                     _findRoutesPending = false;
+                }
+
+                if (_districtCheckFrame++ % 120 == 0 && !_findRoutesPending)
+                {
+                    byte count = 0;
+                    var dmBuf = DistrictManager.instance.m_districts.m_buffer;
+                    for (int i = 1; i < 128; i++)
+                        if ((dmBuf[i].m_flags & District.Flags.Created) != 0) count++;
+                    if (count != _cachedDistrictCount)
+                    {
+                        _cachedDistrictCount = count;
+                        _nearestDistrictCache.Clear();
+                    }
                 }
 
                 var instance = InstanceManager.instance.GetSelectedInstance();
@@ -373,8 +426,8 @@ namespace Breakdown
                 string first, last;
                 if (this.districtsNotSegments)
                 {
-                    first = firstSeg.GetSegmentLocation().GetDistrictName();
-                    last = lastSeg.GetSegmentLocation().GetDistrictName();
+                    first = this.ResolveDistrictName(firstSeg);
+                    last = this.ResolveDistrictName(lastSeg);
                 }
                 else
                 {
@@ -435,6 +488,7 @@ namespace Breakdown
         {
             if (from != to) return null;
             if (from == "Out of town" || from == "No district") return null;
+            if (from.StartsWith("near ")) return null;
             return "(same district)";
         }
 
