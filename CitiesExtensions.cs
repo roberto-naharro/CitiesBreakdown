@@ -20,10 +20,10 @@ namespace Breakdown
         public static bool UnusedOrEmpty(this PathUnit unit)
             => unit.m_referenceCount == 0 || unit.m_positionCount == 0;
 
-        public static Dictionary<uint, uint> GetPathTails(this PathUnit[] pathBuffer)
+        public static Dictionary<uint, uint> GetPathTails(this PathUnit[] pathBuffer, int bufferSize)
         {
             Dictionary<uint, uint> tails = new Dictionary<uint, uint>();
-            foreach (var index in Enumerable.Range(0, pathBuffer.Length))
+            foreach (var index in Enumerable.Range(0, bufferSize))
             {
                 var path = pathBuffer[index];
                 if (path.UnusedOrEmpty())

@@ -185,22 +185,18 @@ namespace Breakdown
             Log.Debug($"InitUI starting, {WorldInfoPanelTypes.Length} panel types to attach.");
             foreach (var worldItem in WorldInfoPanelTypes)
             {
-                var roadInfoObj = GameObject.Find($"(Library) {worldItem.Name}");
-                if (roadInfoObj != null)
+                try
                 {
-                    WorldInfoPanel transportInfoViewPanel = roadInfoObj.GetComponent<WorldInfoPanel>();
-                    if (transportInfoViewPanel != null)
-                    {
-                        this.panels[worldItem.Name] = transportInfoViewPanel.component.AddUIComponent(typeof(UIBreakdownPanel)) as UIBreakdownPanel;
-                    }
-                }
-                if (!this.panels.ContainsKey(worldItem.Name))
-                {
-                    Log.Info($"failed to attach to {worldItem}.");
-                }
-                else
-                {
+                    var roadInfoObj = GameObject.Find($"(Library) {worldItem.Name}");
+                    if (roadInfoObj == null) continue;
+                    WorldInfoPanel wip = roadInfoObj.GetComponent<WorldInfoPanel>();
+                    if (wip == null) continue;
+                    this.panels[worldItem.Name] = wip.component.AddUIComponent(typeof(UIBreakdownPanel)) as UIBreakdownPanel;
                     Log.Debug($"attached to {worldItem}.");
+                }
+                catch (Exception ex)
+                {
+                    Log.Info($"failed to attach to {worldItem}: {ex.Message}");
                 }
             }
             Log.Debug($"InitUI done, {panels.Count} panels attached.");
@@ -221,11 +217,12 @@ namespace Breakdown
                 return;
             }
 
+            int bufferSize = (int)PathManager.instance.m_pathUnits.m_size;
             this.pathCounts.Clear();  // TODO option to aggregate results.
             var sw = new Stopwatch();
             sw.Start();
 
-            var tails = pathBuffer.GetPathTails();
+            var tails = pathBuffer.GetPathTails(bufferSize);
             //UnityEngine.Debug.Log($"{tails.Keys.Count}, {actualTails}, {dups}, {sw.ElapsedMilliseconds}");
 
             HashSet<uint> heads;
@@ -243,7 +240,7 @@ namespace Breakdown
 
             Log.Debug($"FindRoutes tails={tails.Count} heads={heads.Count} pathDict={pathDict.Count} elapsed={sw.ElapsedMilliseconds}ms");
 
-            this.FollowRoutes(pathBuffer, heads, tails);
+            this.FollowRoutes(pathBuffer, bufferSize, heads, tails);
 
             sw.Reset();
             sw.Start();
@@ -275,13 +272,13 @@ namespace Breakdown
             }
         }
 
-        private void FollowRoutes(PathUnit[] pathBuffer, HashSet<uint> heads, Dictionary<uint, uint> tails)
+        private void FollowRoutes(PathUnit[] pathBuffer, int bufferSize, HashSet<uint> heads, Dictionary<uint, uint> tails)
         {
             int headCount = 0;
             var sw = new Stopwatch();
             sw.Start();
-            Log.Debug($"FollowRoutes scanning {pathBuffer.Length} buffer slots for {heads.Count} heads");
-            foreach (var index in Enumerable.Range(0, pathBuffer.Length))
+            Log.Debug($"FollowRoutes scanning {bufferSize} buffer slots for {heads.Count} heads");
+            foreach (var index in Enumerable.Range(0, bufferSize))
             {
                 if (!heads.Contains((uint)index) || tails.ContainsKey((uint)index))
                 {
