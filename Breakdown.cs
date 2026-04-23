@@ -11,9 +11,16 @@ namespace Breakdown
 {
     public class BreakdownMod : IUserMod
     {
+        public static bool DebugLog = false;
+
         public string Name { get { return "Breakdown"; } }
 
         public string Description { get { return "Shows more route details when viewing routes."; } }
+
+        public void OnSettingsUI(UIHelperBase helper)
+        {
+            helper.AddCheckbox("Debug logging", DebugLog, value => { DebugLog = value; });
+        }
     }
 
     public class BreakdownThread : ThreadingExtensionBase
@@ -34,21 +41,19 @@ namespace Breakdown
             this.mPathsInfo = typeof(PathVisualizer).GetField("m_paths", BindingFlags.NonPublic | BindingFlags.Instance);
             this.mInstanceInfo = typeof(PathVisualizer).GetField("m_lastInstance", BindingFlags.NonPublic | BindingFlags.Instance);
             if (this.mPathsInfo == null)
-            {
-                UnityEngine.Debug.Log("Can't get m_paths from PathVisuzlizer.");
-            }
+                Log.Info("Can't get m_paths from PathVisualizer.");
             if (this.mInstanceInfo == null)
-            {
-                UnityEngine.Debug.Log("Can't get m_lastInstance from PathVisuzlizer.");
-            }
+                Log.Info("Can't get m_lastInstance from PathVisualizer.");
         }
+
+        private bool _pathsVisibleLogged = false;
 
         public override void OnUpdate(float realTimeDelta, float simulationTimeDelta)
         {
             var viz = Singleton<PathVisualizer>.instance; // TODO should we be checking "exists" instead of checking instance for null?
             if (viz == null || !viz.PathsVisible || this.mPathsInfo == null || this.mInstanceInfo == null)
             {
-                //UnityEngine.Debug.Log("Route info not showing.");
+                _pathsVisibleLogged = false;
                 foreach (var panel in this.panels.Values)
                 {
                     if (panel != null && panel.enabled)
@@ -59,6 +64,11 @@ namespace Breakdown
             }
             else
             {
+                if (!_pathsVisibleLogged)
+                {
+                    _pathsVisibleLogged = true;
+                    Log.Debug($"PathsVisible=true, panels={panels.Count}, mPathsInfo={mPathsInfo != null}, mInstanceInfo={mInstanceInfo != null}");
+                }
                 if (this.panels.Count == 0)
                 {
                     this.InitUI();
@@ -148,6 +158,7 @@ namespace Breakdown
                 typeof(WarehouseWorldInfoPanel),
                 typeof(ZonedBuildingWorldInfoPanel),
             };
+            Log.Debug($"InitUI starting, {WorldInfoPanelTypes.Length} panel types to attach.");
             foreach (var worldItem in WorldInfoPanelTypes)
             {
                 var roadInfoObj = GameObject.Find($"(Library) {worldItem.Name}");
@@ -161,9 +172,14 @@ namespace Breakdown
                 }
                 if (!this.panels.ContainsKey(worldItem.Name))
                 {
-                    UnityEngine.Debug.Log($"failed to attach to {worldItem}.");
+                    Log.Info($"failed to attach to {worldItem}.");
+                }
+                else
+                {
+                    Log.Debug($"attached to {worldItem}.");
                 }
             }
+            Log.Debug($"InitUI done, {panels.Count} panels attached.");
         }
 
         public void FindRoutes(Dictionary<InstanceID, PathVisualizer.Path> pathDict)
@@ -196,6 +212,8 @@ namespace Breakdown
                 heads = new HashSet<uint>(pathDict.Select(x => x.Value.m_pathUnit).Select(x => GetHead(x, tails)));
             }
 
+            Log.Debug($"FindRoutes tails={tails.Count} heads={heads.Count} pathDict={pathDict.Count} elapsed={sw.ElapsedMilliseconds}ms");
+
             this.FollowRoutes(pathBuffer, heads, tails);
 
             sw.Reset();
@@ -203,6 +221,7 @@ namespace Breakdown
             var pcs = this.GetPathCounts();
             pcs.ForEach(x => x.CountReferences()); // FIXME not sure why this gets all zeros.  Should speed up the OrderBy below.
             var messages = pcs.OrderByDescending(x => x.count.TotalReferences).Take(10).Select(x => x.Format()).ToArray();
+            Log.Debug($"ranked {pcs.Count()} OD pairs, top {messages.Length} messages built in {sw.ElapsedMilliseconds}ms");
             foreach (var panel in panels.Values)
             {
                 if (panel != null)
@@ -232,6 +251,7 @@ namespace Breakdown
             int headCount = 0;
             var sw = new Stopwatch();
             sw.Start();
+            Log.Debug($"FollowRoutes scanning {pathBuffer.Length} buffer slots for {heads.Count} heads");
             foreach (var index in Enumerable.Range(0, pathBuffer.Length))
             {
                 if (!heads.Contains((uint)index) || tails.ContainsKey((uint)index))
@@ -280,7 +300,7 @@ namespace Breakdown
                 this.AddPath(first, last, segmentCount, pathLength,
                     path.m_laneTypes, path.m_pathFindFlags, path.m_referenceCount, (byte)path.m_simulationFlags, path.m_speed, path.m_vehicleTypes);
             }
-            //UnityEngine.Debug.Log($"heads: {headCount}, {sw.ElapsedMilliseconds}");
+            Log.Debug($"FollowRoutes processed {headCount} heads in {sw.ElapsedMilliseconds}ms");
         }
 
         public void AddPath(string from, string to, ushort segments, float length,

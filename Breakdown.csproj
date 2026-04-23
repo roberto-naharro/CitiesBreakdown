@@ -52,6 +52,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="BreakdownUI.cs" />
+    <Compile Include="Log.cs" />
     <Compile Include="CitiesExtensions.cs" />
     <Compile Include="Breakdown.cs" />
     <Compile Include="Counts.cs" />
