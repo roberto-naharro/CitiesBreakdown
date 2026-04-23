@@ -245,8 +245,7 @@ namespace Breakdown
             sw.Reset();
             sw.Start();
             var pcs = this.GetPathCounts();
-            pcs.ForEach(x => x.CountReferences()); // FIXME not sure why this gets all zeros.  Should speed up the OrderBy below.
-            var messages = pcs.OrderByDescending(x => x.count.TotalReferences).Take(10).Select(x => x.Format()).ToArray();
+            var messages = pcs.OrderByDescending(x => x.count.refs).Take(10).Select(x => x.Format()).ToArray();
             Log.Debug($"ranked {pcs.Count()} OD pairs, top {messages.Length} messages built in {sw.ElapsedMilliseconds}ms");
             foreach (var panel in panels.Values)
             {
@@ -381,23 +380,16 @@ namespace Breakdown
         public PathDetails count;
         public string from;
         public string to;
-        public long References;
 
         public override string ToString()
         {
-            return $"{this.References} : {this.from} -> {this.to}";
-        }
-
-        public void CountReferences()
-        {
-            this.References = this.count.TotalReferences;
+            return $"{this.count.refs} : {this.from} -> {this.to}";
         }
 
         public string Format()
         {
-            this.CountReferences();
-            var routeLabel = this.References == 1 ? "route" : "routes";
-            return $"{this.from} to {this.to} ({this.References} {routeLabel})\n";
+            var routeLabel = this.count.refs == 1 ? "route" : "routes";
+            return $"{this.from} to {this.to} ({this.count.refs} {routeLabel})\n";
         }
     }
 
@@ -412,8 +404,6 @@ namespace Breakdown
         public Counts<byte> simulationFlags = new Counts<byte>();
         public Counts<byte> speed = new Counts<byte>();
         public Counts<uint> vehicleTypes = new Counts<uint>();
-
-        public long TotalReferences => this.referenceCount.Counters.Sum(x => x.Key * x.Value);
 
         public override string ToString()
         {
