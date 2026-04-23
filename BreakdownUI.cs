@@ -33,11 +33,9 @@ namespace Breakdown
             {
                 return;
             }
-            var topTenIndex = 0;
-            foreach (var label in this.topTen)
+            for (int i = 0; i < this.topTen.Length; i++)
             {
-                this.topTen[topTenIndex].text = topTenIndex < messages.Length ? messages[topTenIndex] : string.Empty;
-                topTenIndex++;
+                this.topTen[i].text = i < messages.Length ? messages[i] : string.Empty;
             }
         }
     }

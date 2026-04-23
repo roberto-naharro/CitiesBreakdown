@@ -88,7 +88,7 @@ namespace Breakdown
                     }
                 }
                 var instance = (InstanceID)this.mInstanceInfo.GetValue(viz);
-                if (this.lastInstance == null || instance != this.lastInstance)
+                if (instance != this.lastInstance)
                 {
                     this.lastInstance = instance;
                     //UnityEngine.Debug.Log($"new instance on {lastRefreshFrame}.");
@@ -205,7 +205,10 @@ namespace Breakdown
             var messages = pcs.OrderByDescending(x => x.count.TotalReferences).Take(10).Select(x => x.Format()).ToArray();
             foreach (var panel in panels.Values)
             {
-                panel.SetTopTen(messages);
+                if (panel != null)
+                {
+                    panel.SetTopTen(messages);
+                }
             }
             var message = string.Join("\n", messages);
             if (message == string.Empty)
@@ -275,7 +278,7 @@ namespace Breakdown
                 }
 
                 this.AddPath(first, last, segmentCount, pathLength,
-                    path.m_laneTypes, path.m_pathFindFlags, path.m_referenceCount, path.m_simulationFlags, path.m_speed, path.m_vehicleTypes);
+                    path.m_laneTypes, path.m_pathFindFlags, path.m_referenceCount, (byte)path.m_simulationFlags, path.m_speed, path.m_vehicleTypes);
             }
             //UnityEngine.Debug.Log($"heads: {headCount}, {sw.ElapsedMilliseconds}");
         }

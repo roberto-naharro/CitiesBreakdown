@@ -27,8 +27,6 @@ namespace Breakdown
         public static Dictionary<uint, uint> GetPathTails(this PathUnit[] pathBuffer)
         {
             Dictionary<uint, uint> tails = new Dictionary<uint, uint>();
-            ulong dups = 0;
-            ulong actualTails = 0;
             foreach (var index in Enumerable.Range(0, pathBuffer.Length))
             {
                 var path = pathBuffer[index];
@@ -38,12 +36,10 @@ namespace Breakdown
                 }
                 if (path.m_nextPathUnit == 0)
                 {
-                    actualTails++;
                     continue;
                 }
                 if (tails.ContainsKey(path.m_nextPathUnit))
                 {
-                    dups++;
                     continue;
                 }
                 tails[path.m_nextPathUnit] = (uint)index;
