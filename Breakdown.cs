@@ -392,12 +392,12 @@ namespace Breakdown
                     {
                         float df = Vector3.Distance(entityPos, GetDistrictPosition(x.from));
                         float dt = Vector3.Distance(entityPos, GetDistrictPosition(x.to));
-                        return Math.Min(df, dt);
+                        return (float.IsInfinity(df) || float.IsInfinity(dt)) ? float.MaxValue : Math.Min(df, dt);
                     }
                     return Vector3.Distance(entityPos, GetDistrictPosition(keyDistrict));
                 })
                 .ThenByDescending(x => x.count.refs)
-                .Take(10)
+                .Take(15)
                 .ToArray();
 
             var prefixes    = new string[ranked.Length];

@@ -5,7 +5,7 @@ namespace Breakdown
 {
     public class UIBreakdownPanel : UIPanel
     {
-        private const int RowCount = 10;
+        private const int RowCount = 15;
         private static readonly Color32 MutedColor = new Color32(160, 160, 160, 255);
 
         private UIPanel[]  _rows;
