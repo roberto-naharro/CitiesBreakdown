@@ -207,6 +207,8 @@ namespace Breakdown
             var viz = Singleton<PathVisualizer>.instance; // TODO should we be checking "exists" instead of checking instance for null?
             if (viz == null || !viz.PathsVisible || this.mPathsInfo == null)
             {
+                if (_pathsVisibleLogged)
+                    Log.Debug($"PathsVisible=false, hiding {panels.Count} panels, pendingPending={_findRoutesPending}");
                 _pathsVisibleLogged = false;
                 foreach (var panel in this.panels.Values)
                 {
@@ -239,6 +241,7 @@ namespace Breakdown
 
                 if (_pendingResultReady)
                 {
+                    Log.Debug("Picking up pending result from sim thread");
                     _pendingResultReady = false;
                     if (_pendingUIUpdate != null) _pendingUIUpdate();
                     _findRoutesPending = false;
@@ -274,6 +277,7 @@ namespace Breakdown
                     var capturedInstance = instance;
                     var capturedPaths    = paths;
                     _findRoutesPending = true;
+                    Log.Debug($"Queuing AddAction, frame={lastRefreshFrame}, thread={System.Threading.Thread.CurrentThread.ManagedThreadId}");
                     SimulationManager.instance.AddAction(() => FindRoutesOnSimThread(capturedPaths, capturedInstance));
                 }
             }
@@ -344,6 +348,20 @@ namespace Breakdown
 
         private void FindRoutesOnSimThread(Dictionary<InstanceID, PathVisualizer.Path> pathDict, InstanceID instance)
         {
+            try
+            {
+                FindRoutesOnSimThreadInner(pathDict, instance);
+            }
+            catch (Exception ex)
+            {
+                Log.Info($"FindRoutesOnSimThread unhandled exception: {ex.Message}\n{ex.StackTrace}");
+                _findRoutesPending = false;
+            }
+        }
+
+        private void FindRoutesOnSimThreadInner(Dictionary<InstanceID, PathVisualizer.Path> pathDict, InstanceID instance)
+        {
+            Log.Debug($"FindRoutesOnSimThread start, thread={System.Threading.Thread.CurrentThread.ManagedThreadId}");
             if (pathDict == null) { _findRoutesPending = false; return; }
 
             var pathBuffer = PathManager.instance?.m_pathUnits?.m_buffer;

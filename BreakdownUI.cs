@@ -16,16 +16,21 @@ namespace Breakdown
         private UILabel[]  _tagLabels;
         private UILabel[]  _countLabels;
 
+        public override void Awake()
+        {
+            base.Awake();
+            this.isInteractive = false;
+            this.canFocus = false;
+            this.isVisible = false;
+        }
+
         public override void Start()
         {
             base.Start();
             this.backgroundSprite = "GenericPanel";
             this.color = new Color32(20, 20, 20, 235);
-            this.isVisible = false;
             this.relativePosition = new Vector3(parent.width, 0);
-            parent.eventSizeChanged     += (c, v) => { this.relativePosition = new Vector3(parent.width, 0); };
-            parent.eventPositionChanged += (c, v) => { this.relativePosition = new Vector3(parent.width, 0); };
-            this.isInteractive = false;
+            parent.eventSizeChanged += (c, v) => { this.relativePosition = new Vector3(parent.width, 0); };
             this.name = "BreakdownModPanel";
             this.autoLayout = true;
             this.autoLayoutDirection = LayoutDirection.Vertical;
