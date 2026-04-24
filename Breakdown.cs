@@ -305,7 +305,7 @@ namespace Breakdown
                 //typeof(AnimalWorldInfoPanel),
                 typeof(CampusWorldInfoPanel),
                 typeof(CitizenVehicleWorldInfoPanel),
-                //typeof(CitizenWorldInfoPanel),
+                typeof(CitizenWorldInfoPanel),
                 typeof(CityServiceVehicleWorldInfoPanel),
                 typeof(CityServiceWorldInfoPanel),
                 typeof(DistrictWorldInfoPanel),
