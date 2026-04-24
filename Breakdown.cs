@@ -400,25 +400,39 @@ namespace Breakdown
             string selectedDistrict = GetSelectedDistrict(instance);
             Vector3 entityPos = GetEntityPosition(instance);
 
-            var ranked = this.GetPathCounts()
-                .OrderBy(x =>
-                {
-                    string keyDistrict;
-                    if (selectedDistrict != null && x.to == selectedDistrict)
-                        keyDistrict = x.from;
-                    else if (selectedDistrict != null && x.from == selectedDistrict)
-                        keyDistrict = x.to;
-                    else
+            bool sortByCount = instance.Type == InstanceType.NetSegment || instance.Type == InstanceType.NetNode;
+            int takeCount = this.districtsNotSegments ? 15 : 25;
+
+            PathCount[] ranked;
+            if (sortByCount)
+            {
+                ranked = this.GetPathCounts()
+                    .OrderByDescending(x => x.count.refs)
+                    .Take(takeCount)
+                    .ToArray();
+            }
+            else
+            {
+                ranked = this.GetPathCounts()
+                    .OrderBy(x =>
                     {
-                        float df = Vector3.Distance(entityPos, GetDistrictPosition(x.from));
-                        float dt = Vector3.Distance(entityPos, GetDistrictPosition(x.to));
-                        return (float.IsInfinity(df) || float.IsInfinity(dt)) ? float.MaxValue : Math.Min(df, dt);
-                    }
-                    return Vector3.Distance(entityPos, GetDistrictPosition(keyDistrict));
-                })
-                .ThenByDescending(x => x.count.refs)
-                .Take(this.districtsNotSegments ? 15 : 25)
-                .ToArray();
+                        string keyDistrict;
+                        if (selectedDistrict != null && x.to == selectedDistrict)
+                            keyDistrict = x.from;
+                        else if (selectedDistrict != null && x.from == selectedDistrict)
+                            keyDistrict = x.to;
+                        else
+                        {
+                            float df = Vector3.Distance(entityPos, GetDistrictPosition(x.from));
+                            float dt = Vector3.Distance(entityPos, GetDistrictPosition(x.to));
+                            return (float.IsInfinity(df) || float.IsInfinity(dt)) ? float.MaxValue : Math.Min(df, dt);
+                        }
+                        return Vector3.Distance(entityPos, GetDistrictPosition(keyDistrict));
+                    })
+                    .ThenByDescending(x => x.count.refs)
+                    .Take(takeCount)
+                    .ToArray();
+            }
 
             var prefixes    = new string[ranked.Length];
             var froms       = new string[ranked.Length];
@@ -517,6 +531,7 @@ namespace Breakdown
                 {
                     first = firstSeg.GetSegmentName();
                     last = lastSeg.GetSegmentName();
+                    if (string.IsNullOrEmpty(first) || string.IsNullOrEmpty(last)) continue;
                 }
 
                 this.AddPath(first, last, segmentCount, pathLength,

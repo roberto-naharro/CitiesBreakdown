@@ -7,12 +7,12 @@ namespace Breakdown
     public class UIBreakdownPanel : UIPanel
     {
         private const int RowCount    = 25;
-        private const float TextScale = 0.8f;
+        private const float TextScale = 0.7f;
         private static readonly Color32 MutedColor  = new Color32(160, 160, 160, 255);
         private static readonly Color32 ActiveColor = new Color32(255, 255, 255, 255);
 
-        private UILabel _districtsLabel;
-        private UILabel _roadsLabel;
+        private UIButton _districtsButton;
+        private UIButton _roadsButton;
 
         private UIPanel[]  _rows;
         private UILabel[]  _prefixLabels;
@@ -54,14 +54,19 @@ namespace Breakdown
             header.autoFitChildrenHorizontally = true;
             header.autoFitChildrenVertically = true;
 
-            _districtsLabel = header.AddUIComponent<UILabel>();
-            _districtsLabel.text = "Districts";
-            _districtsLabel.textColor = ActiveColor;
-            _districtsLabel.textScale = TextScale;
-            _districtsLabel.padding = new RectOffset(8, 4, 6, 6);
-            _districtsLabel.canFocus = false;
-            _districtsLabel.isInteractive = true;
-            _districtsLabel.eventClick += (c, e) =>
+            _districtsButton = header.AddUIComponent<UIButton>();
+            _districtsButton.text = "Districts";
+            _districtsButton.textScale = TextScale;
+            _districtsButton.textColor = ActiveColor;
+            _districtsButton.hoveredTextColor = ActiveColor;
+            _districtsButton.normalBgSprite = "ButtonSmall";
+            _districtsButton.hoveredBgSprite = "ButtonSmallHovered";
+            _districtsButton.pressedBgSprite = "ButtonSmallPressed";
+            _districtsButton.focusedBgSprite = "ButtonSmall";
+            _districtsButton.autoSize = true;
+            _districtsButton.canFocus = false;
+            _districtsButton.textPadding = new RectOffset(8, 8, 4, 4);
+            _districtsButton.eventClick += (c, e) =>
             {
                 if (_districtsMode) return;
                 _districtsMode = true;
@@ -69,20 +74,19 @@ namespace Breakdown
                 if (OnModeToggled != null) OnModeToggled();
             };
 
-            var sep = header.AddUIComponent<UILabel>();
-            sep.text = "|";
-            sep.textColor = MutedColor;
-            sep.textScale = TextScale;
-            sep.padding = new RectOffset(0, 0, 6, 6);
-
-            _roadsLabel = header.AddUIComponent<UILabel>();
-            _roadsLabel.text = "Roads";
-            _roadsLabel.textColor = MutedColor;
-            _roadsLabel.textScale = TextScale;
-            _roadsLabel.padding = new RectOffset(4, 8, 6, 6);
-            _roadsLabel.canFocus = false;
-            _roadsLabel.isInteractive = true;
-            _roadsLabel.eventClick += (c, e) =>
+            _roadsButton = header.AddUIComponent<UIButton>();
+            _roadsButton.text = "Roads";
+            _roadsButton.textScale = TextScale;
+            _roadsButton.textColor = MutedColor;
+            _roadsButton.hoveredTextColor = ActiveColor;
+            _roadsButton.normalBgSprite = "";
+            _roadsButton.hoveredBgSprite = "ButtonSmallHovered";
+            _roadsButton.pressedBgSprite = "ButtonSmallPressed";
+            _roadsButton.focusedBgSprite = "";
+            _roadsButton.autoSize = true;
+            _roadsButton.canFocus = false;
+            _roadsButton.textPadding = new RectOffset(8, 8, 4, 4);
+            _roadsButton.eventClick += (c, e) =>
             {
                 if (!_districtsMode) return;
                 _districtsMode = false;
@@ -144,9 +148,13 @@ namespace Breakdown
 
         private void UpdateToggleState()
         {
-            if (_districtsLabel == null) return;
-            _districtsLabel.textColor = _districtsMode ? ActiveColor : MutedColor;
-            _roadsLabel.textColor     = _districtsMode ? MutedColor  : ActiveColor;
+            if (_districtsButton == null) return;
+            _districtsButton.textColor       = _districtsMode ? ActiveColor : MutedColor;
+            _districtsButton.normalBgSprite  = _districtsMode ? "ButtonSmall" : "";
+            _districtsButton.focusedBgSprite = _districtsMode ? "ButtonSmall" : "";
+            _roadsButton.textColor           = _districtsMode ? MutedColor  : ActiveColor;
+            _roadsButton.normalBgSprite      = _districtsMode ? "" : "ButtonSmall";
+            _roadsButton.focusedBgSprite     = _districtsMode ? "" : "ButtonSmall";
         }
 
         public void SetTopTen(string[] prefixes, string[] froms, Color32[] fromColors,
