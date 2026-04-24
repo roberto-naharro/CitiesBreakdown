@@ -51,6 +51,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="BreakdownAccordionPanel.cs" />
     <Compile Include="BreakdownUI.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="CitiesExtensions.cs" />

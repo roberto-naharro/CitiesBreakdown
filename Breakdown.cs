@@ -68,6 +68,13 @@ namespace Breakdown
         private byte _cachedDistrictCount = 0;
         private int  _districtCheckFrame  = 0;
 
+        private UIBreakdownAccordionPanel _accordionPanel;
+        private volatile bool _findCityWideRoutesPending  = false;
+        private volatile bool _pendingCityWideResultReady = false;
+        private Action _pendingCityWideUIUpdate;
+        private int _cityWideRefreshFrame = 0;
+        private bool _wasPopupOpen = false;
+
         private volatile bool _findRoutesPending = false;
         private volatile bool _pendingResultReady = false;
         private Action _pendingUIUpdate;
@@ -210,6 +217,7 @@ namespace Breakdown
                 if (_pathsVisibleLogged)
                     Log.Debug($"PathsVisible=false, hiding {panels.Count} panels, pendingPending={_findRoutesPending}");
                 _pathsVisibleLogged = false;
+                if (_accordionPanel != null) _accordionPanel.isVisible = false;
                 foreach (var panel in this.panels.Values)
                 {
                     if (panel != null && panel.enabled)
@@ -262,6 +270,10 @@ namespace Breakdown
                 }
 
                 var instance = InstanceManager.instance.GetSelectedInstance();
+
+                if (_cityWideRefreshFrame % 120 == 0)
+                    Log.Debug($"[status] mode={InfoManager.instance?.CurrentMode} instance.IsEmpty={instance.IsEmpty} accordionNull={_accordionPanel == null} cityWidePending={_findCityWideRoutesPending} pathsCount={paths?.Count}");
+
                 if (instance != this.lastInstance)
                 {
                     this.lastInstance = instance;
@@ -280,6 +292,44 @@ namespace Breakdown
                     Log.Debug($"Queuing AddAction, frame={lastRefreshFrame}, thread={System.Threading.Thread.CurrentThread.ManagedThreadId}");
                     SimulationManager.instance.AddAction(() => FindRoutesOnSimThread(capturedPaths, capturedInstance));
                 }
+
+                bool inTrafficRoutesMode = InfoManager.instance != null &&
+                    InfoManager.instance.CurrentMode == InfoManager.InfoMode.TrafficRoutes;
+                bool noPopupOpen = true;
+                foreach (var p in this.panels.Values)
+                    if (p != null && p.parent != null && p.parent.isVisible) { noPopupOpen = false; break; }
+                if (inTrafficRoutesMode && noPopupOpen)
+                {
+                    if (_accordionPanel == null) InitAccordionUI();
+                    if (_wasPopupOpen)
+                    {
+                        // Popup just closed — discard any stale scan and force an immediate refresh
+                        _findCityWideRoutesPending  = false;
+                        _pendingCityWideResultReady = false;
+                        _cityWideRefreshFrame = 0;
+                        if (_accordionPanel != null) _accordionPanel.ShowLoading();
+                    }
+                    if (_pendingCityWideResultReady)
+                    {
+                        Log.Debug("Picking up city-wide pending result");
+                        _pendingCityWideResultReady = false;
+                        if (_pendingCityWideUIUpdate != null) _pendingCityWideUIUpdate();
+                        _findCityWideRoutesPending = false;
+                    }
+                    if (_cityWideRefreshFrame++ % 300 == 0 && !_findCityWideRoutesPending)
+                    {
+                        var capturedPaths2 = paths;
+                        _findCityWideRoutesPending = true;
+                        Log.Debug("Queuing city-wide AddAction");
+                        if (_accordionPanel != null) _accordionPanel.ShowLoading();
+                        SimulationManager.instance.AddAction(() => FindCityWideRoutesOnSimThread(capturedPaths2));
+                    }
+                }
+                else if (_accordionPanel != null)
+                {
+                    _accordionPanel.isVisible = false;
+                }
+                _wasPopupOpen = !noPopupOpen;
             }
             base.OnUpdate(realTimeDelta, simulationTimeDelta);
         }
@@ -294,6 +344,7 @@ namespace Breakdown
                 }
             }
             this.panels.Clear();
+            if (_accordionPanel != null) { UnityEngine.Object.Destroy(_accordionPanel); _accordionPanel = null; }
             base.OnReleased();
         }
 
@@ -348,6 +399,32 @@ namespace Breakdown
             Log.Debug($"InitUI done, {panels.Count} panels attached.");
         }
 
+        private void InitAccordionUI()
+        {
+            Log.Info("InitAccordionUI starting");
+            try
+            {
+                var obj = GameObject.Find("(Library) TrafficRoutesInfoViewPanel");
+                if (obj == null) { Log.Info("TrafficRoutesInfoViewPanel GO not found"); return; }
+                var comp = obj.GetComponent<TrafficRoutesInfoViewPanel>();
+                if (comp == null) { Log.Info("No TrafficRoutesInfoViewPanel component"); return; }
+                var parent = comp.component;
+                _accordionPanel = parent.AddUIComponent(typeof(UIBreakdownAccordionPanel)) as UIBreakdownAccordionPanel;
+                if (_accordionPanel == null) { Log.Info("Accordion AddUIComponent returned null"); return; }
+                _accordionPanel.relativePosition = new Vector3(0, parent.height);
+                parent.eventSizeChanged += (c, v) =>
+                {
+                    if (_accordionPanel != null) _accordionPanel.relativePosition = new Vector3(0, parent.height);
+                };
+                _cityWideRefreshFrame = 299; // let Start() run one frame before first ShowLoading call
+                Log.Info("InitAccordionUI done");
+            }
+            catch (Exception ex)
+            {
+                Log.Info($"InitAccordionUI failed: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
         private void FindRoutesOnSimThread(Dictionary<InstanceID, PathVisualizer.Path> pathDict, InstanceID instance)
         {
             try
@@ -392,7 +469,7 @@ namespace Breakdown
 
             Log.Debug($"FindRoutes tails={tails.Count} heads={heads.Count} pathDict={pathDict.Count} elapsed={sw.ElapsedMilliseconds}ms");
 
-            this.FollowRoutes(pathBuffer, bufferSize, heads, tails);
+            this.FollowRoutes(pathBuffer, bufferSize, heads, tails, this.districtsNotSegments);
 
             sw.Reset();
             sw.Start();
@@ -480,20 +557,53 @@ namespace Breakdown
             _pendingResultReady = true;
         }
 
+        private void FindCityWideRoutesOnSimThread(Dictionary<InstanceID, PathVisualizer.Path> pathDict)
+        {
+            try { FindCityWideRoutesOnSimThreadInner(pathDict); }
+            catch (Exception ex)
+            {
+                Log.Info($"FindCityWideRoutesOnSimThread exception: {ex.Message}");
+                _findCityWideRoutesPending = false;
+            }
+        }
+
+        private void FindCityWideRoutesOnSimThreadInner(Dictionary<InstanceID, PathVisualizer.Path> pathDict)
+        {
+            Log.Debug("FindCityWideRoutes start");
+
+            var pathBuffer = PathManager.instance?.m_pathUnits?.m_buffer;
+            if (pathBuffer == null) { _findCityWideRoutesPending = false; return; }
+
+            int bufferSize = (int)PathManager.instance.m_pathUnits.m_size;
+            this.pathCounts.Clear();
+
+            var tails = pathBuffer.GetPathTails(bufferSize);
+
+            // Pass null heads = scan every active head in the full buffer (city-wide mode)
+            this.FollowRoutes(pathBuffer, bufferSize, null, tails, true);
+
+            var sections = BuildDistrictSections();
+            Log.Debug($"FindCityWideRoutes done, {sections.Length} sections");
+
+            _pendingCityWideUIUpdate = () =>
+            {
+                if (_accordionPanel != null) _accordionPanel.SetData(sections);
+            };
+            _pendingCityWideResultReady = true;
+        }
+
         private readonly HashSet<uint> _loopCheckBuffer = new HashSet<uint>();
 
-        private void FollowRoutes(PathUnit[] pathBuffer, int bufferSize, HashSet<uint> heads, Dictionary<uint, uint> tails)
+        private void FollowRoutes(PathUnit[] pathBuffer, int bufferSize, HashSet<uint> heads, Dictionary<uint, uint> tails, bool useDistricts)
         {
             int headCount = 0;
             var sw = new Stopwatch();
             sw.Start();
-            Log.Debug($"FollowRoutes scanning {bufferSize} buffer slots for {heads.Count} heads");
+            Log.Debug($"FollowRoutes scanning {bufferSize} buffer slots, heads={(heads != null ? heads.Count.ToString() : "ALL")}");
             for (int index = 0; index < bufferSize; index++)
             {
-                if (!heads.Contains((uint)index) || tails.ContainsKey((uint)index))
-                {
-                    continue;
-                }
+                if (heads != null && !heads.Contains((uint)index)) continue;
+                if (tails.ContainsKey((uint)index)) continue;
 
                 var path = pathBuffer[index];
 
@@ -522,7 +632,7 @@ namespace Breakdown
                 lastSeg = lastPosition.m_segment;
 
                 string first, last;
-                if (this.districtsNotSegments)
+                if (useDistricts)
                 {
                     first = this.ResolveDistrictName(firstSeg);
                     last = this.ResolveDistrictName(lastSeg);
@@ -572,6 +682,59 @@ namespace Breakdown
                     yield return new PathCount() { from = fromCount.Key, to = toCount.Key, count = toCount.Value };
                 }
             }
+        }
+
+        private DistrictSection[] BuildDistrictSections()
+        {
+            // Merge A→B and B→A into a single (min,max) keyed pair
+            var merged = new Dictionary<string, Dictionary<string, uint>>();
+            foreach (var fromKv in this.pathCounts)
+            {
+                foreach (var toKv in fromKv.Value)
+                {
+                    string a = fromKv.Key, b = toKv.Key;
+                    if (string.Compare(a, b, StringComparison.Ordinal) > 0) { var tmp = a; a = b; b = tmp; }
+                    if (!merged.ContainsKey(a)) merged[a] = new Dictionary<string, uint>();
+                    if (!merged[a].ContainsKey(b)) merged[a][b] = 0;
+                    merged[a][b] += toKv.Value.refs;
+                }
+            }
+
+            // Accumulate per-district totals and connection lists
+            var totals      = new Dictionary<string, uint>();
+            var connections = new Dictionary<string, List<ConnectionData>>();
+            foreach (var aKv in merged)
+            {
+                foreach (var bKv in aKv.Value)
+                {
+                    string a = aKv.Key, b = bKv.Key;
+                    if (a == b) continue; // skip same-district paths (avoids self-connection duplication)
+                    uint   n = bKv.Value;
+
+                    if (!totals.ContainsKey(a)) { totals[a] = 0; connections[a] = new List<ConnectionData>(); }
+                    if (!totals.ContainsKey(b)) { totals[b] = 0; connections[b] = new List<ConnectionData>(); }
+                    totals[a] += n;
+                    totals[b] += n;
+                    connections[a].Add(new ConnectionData { name = b, color = GetDistrictColor(b), routes = n });
+                    connections[b].Add(new ConnectionData { name = a, color = GetDistrictColor(a), routes = n });
+                }
+            }
+
+            return totals
+                .Where(x => !x.Key.StartsWith("near ") && x.Key != "No district" && x.Key != "Out of town")
+                .OrderByDescending(x => x.Value)
+                .Take(UIBreakdownAccordionPanel.MaxSections)
+                .Select(x => new DistrictSection
+                {
+                    name        = x.Key,
+                    color       = GetDistrictColor(x.Key),
+                    totalRoutes = x.Value,
+                    connections = connections[x.Key]
+                        .OrderByDescending(c => c.routes)
+                        .Take(UIBreakdownAccordionPanel.MaxConnections)
+                        .ToArray()
+                })
+                .ToArray();
         }
 
         private void ToggleDistrictsRoads()
