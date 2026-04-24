@@ -1,3 +1,4 @@
+using System;
 using ColossalFramework.UI;
 using UnityEngine;
 
@@ -5,8 +6,13 @@ namespace Breakdown
 {
     public class UIBreakdownPanel : UIPanel
     {
-        private const int RowCount = 15;
-        private static readonly Color32 MutedColor = new Color32(160, 160, 160, 255);
+        private const int RowCount    = 25;
+        private const float TextScale = 0.8f;
+        private static readonly Color32 MutedColor  = new Color32(160, 160, 160, 255);
+        private static readonly Color32 ActiveColor = new Color32(255, 255, 255, 255);
+
+        private UILabel _districtsLabel;
+        private UILabel _roadsLabel;
 
         private UIPanel[]  _rows;
         private UILabel[]  _prefixLabels;
@@ -16,12 +22,16 @@ namespace Breakdown
         private UILabel[]  _tagLabels;
         private UILabel[]  _countLabels;
 
+        private bool _districtsMode = true;
+
+        public Action OnModeToggled;
+
         public override void Awake()
         {
             base.Awake();
-            this.isInteractive = false;
-            this.canFocus = false;
+            this.canFocus  = false;
             this.isVisible = false;
+            // isInteractive left true so header labels can receive clicks
         }
 
         public override void Start()
@@ -37,6 +47,50 @@ namespace Breakdown
             this.autoFitChildrenHorizontally = true;
             this.autoFitChildrenVertically = true;
 
+            // ── Header row ──────────────────────────────────────────────────
+            var header = this.AddUIComponent<UIPanel>();
+            header.autoLayout = true;
+            header.autoLayoutDirection = LayoutDirection.Horizontal;
+            header.autoFitChildrenHorizontally = true;
+            header.autoFitChildrenVertically = true;
+
+            _districtsLabel = header.AddUIComponent<UILabel>();
+            _districtsLabel.text = "Districts";
+            _districtsLabel.textColor = ActiveColor;
+            _districtsLabel.textScale = TextScale;
+            _districtsLabel.padding = new RectOffset(8, 4, 6, 6);
+            _districtsLabel.canFocus = false;
+            _districtsLabel.isInteractive = true;
+            _districtsLabel.eventClick += (c, e) =>
+            {
+                if (_districtsMode) return;
+                _districtsMode = true;
+                UpdateToggleState();
+                if (OnModeToggled != null) OnModeToggled();
+            };
+
+            var sep = header.AddUIComponent<UILabel>();
+            sep.text = "|";
+            sep.textColor = MutedColor;
+            sep.textScale = TextScale;
+            sep.padding = new RectOffset(0, 0, 6, 6);
+
+            _roadsLabel = header.AddUIComponent<UILabel>();
+            _roadsLabel.text = "Roads";
+            _roadsLabel.textColor = MutedColor;
+            _roadsLabel.textScale = TextScale;
+            _roadsLabel.padding = new RectOffset(4, 8, 6, 6);
+            _roadsLabel.canFocus = false;
+            _roadsLabel.isInteractive = true;
+            _roadsLabel.eventClick += (c, e) =>
+            {
+                if (!_districtsMode) return;
+                _districtsMode = false;
+                UpdateToggleState();
+                if (OnModeToggled != null) OnModeToggled();
+            };
+
+            // ── Data rows ────────────────────────────────────────────────────
             _rows         = new UIPanel[RowCount];
             _prefixLabels = new UILabel[RowCount];
             _fromLabels   = new UILabel[RowCount];
@@ -56,42 +110,63 @@ namespace Breakdown
 
                 _prefixLabels[i] = _rows[i].AddUIComponent<UILabel>();
                 _prefixLabels[i].textColor = MutedColor;
+                _prefixLabels[i].textScale = TextScale;
                 _prefixLabels[i].padding = new RectOffset(8, 2, 4, 4);
                 _prefixLabels[i].isVisible = false;
 
                 _fromLabels[i] = _rows[i].AddUIComponent<UILabel>();
+                _fromLabels[i].textScale = TextScale;
                 _fromLabels[i].padding = new RectOffset(8, 4, 4, 4);
 
                 _arrowLabels[i] = _rows[i].AddUIComponent<UILabel>();
                 _arrowLabels[i].text = "→";
                 _arrowLabels[i].textColor = MutedColor;
+                _arrowLabels[i].textScale = TextScale;
                 _arrowLabels[i].padding = new RectOffset(0, 4, 4, 4);
                 _arrowLabels[i].isVisible = false;
 
                 _toLabels[i] = _rows[i].AddUIComponent<UILabel>();
+                _toLabels[i].textScale = TextScale;
                 _toLabels[i].padding = new RectOffset(0, 4, 4, 4);
                 _toLabels[i].isVisible = false;
 
                 _tagLabels[i] = _rows[i].AddUIComponent<UILabel>();
+                _tagLabels[i].textScale = TextScale;
                 _tagLabels[i].padding = new RectOffset(0, 4, 4, 4);
                 _tagLabels[i].isVisible = false;
 
                 _countLabels[i] = _rows[i].AddUIComponent<UILabel>();
                 _countLabels[i].textColor = MutedColor;
+                _countLabels[i].textScale = TextScale;
                 _countLabels[i].padding = new RectOffset(0, 8, 4, 4);
             }
         }
 
+        private void UpdateToggleState()
+        {
+            if (_districtsLabel == null) return;
+            _districtsLabel.textColor = _districtsMode ? ActiveColor : MutedColor;
+            _roadsLabel.textColor     = _districtsMode ? MutedColor  : ActiveColor;
+        }
+
         public void SetTopTen(string[] prefixes, string[] froms, Color32[] fromColors,
-            string[] tos, Color32[] toColors, string[] tags, string[] counts, bool[] rowShowBoth)
+            string[] tos, Color32[] toColors, string[] tags, string[] counts, bool[] rowShowBoth,
+            bool districtsMode = true)
         {
             if (_rows == null) return;
+
+            if (districtsMode != _districtsMode)
+            {
+                _districtsMode = districtsMode;
+                UpdateToggleState();
+            }
+
             for (int i = 0; i < RowCount; i++)
             {
                 if (i < froms.Length)
                 {
-                    bool hasTag  = tags[i] != null;
-                    bool both    = i < rowShowBoth.Length && rowShowBoth[i];
+                    bool hasTag    = tags[i] != null;
+                    bool both      = i < rowShowBoth.Length && rowShowBoth[i];
                     bool hasPrefix = prefixes[i] != string.Empty;
 
                     _prefixLabels[i].text      = prefixes[i];
@@ -106,21 +181,25 @@ namespace Breakdown
                         ? new RectOffset(0, 4, 4, 4)
                         : new RectOffset(8, 4, 4, 4);
 
-                    if (hasTag)
-                    {
-                        _tagLabels[i].text      = tags[i];
-                        _tagLabels[i].textColor = fromColors[i];
-                    }
-                    _tagLabels[i].isVisible  = hasTag;
                     _arrowLabels[i].isVisible = both && !hasTag;
-                    _toLabels[i].isVisible    = both && !hasTag;
+
+                    _toLabels[i].isVisible = both && !hasTag;
                     if (both && !hasTag)
                     {
                         _toLabels[i].text      = tos[i];
                         _toLabels[i].textColor = toColors[i];
                     }
+
+                    if (hasTag)
+                    {
+                        _tagLabels[i].text      = tags[i];
+                        _tagLabels[i].textColor = fromColors[i];
+                    }
+                    _tagLabels[i].isVisible = hasTag;
+
                     _countLabels[i].text      = counts[i];
                     _countLabels[i].isVisible = counts[i] != string.Empty;
+
                     _rows[i].isVisible = true;
                 }
                 else

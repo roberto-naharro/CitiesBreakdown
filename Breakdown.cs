@@ -268,7 +268,7 @@ namespace Breakdown
                     //UnityEngine.Debug.Log($"new instance on {lastRefreshFrame}.");
                     foreach (var panel in this.panels.Values)
                     {
-                        panel.SetTopTen(new string[0], new string[0], new Color32[0], new string[0], new Color32[0], new string[0], new string[0], new bool[0]);
+                        panel.SetTopTen(new string[0], new string[0], new Color32[0], new string[0], new Color32[0], new string[0], new string[0], new bool[0], this.districtsNotSegments);
                     }
                     this.lastRefreshFrame = 0;
                 }
@@ -335,7 +335,9 @@ namespace Breakdown
                     if (roadInfoObj == null) continue;
                     WorldInfoPanel wip = roadInfoObj.GetComponent<WorldInfoPanel>();
                     if (wip == null) continue;
-                    this.panels[worldItem.Name] = wip.component.AddUIComponent(typeof(UIBreakdownPanel)) as UIBreakdownPanel;
+                    var bp = wip.component.AddUIComponent(typeof(UIBreakdownPanel)) as UIBreakdownPanel;
+                    bp.OnModeToggled = this.ToggleDistrictsRoads;
+                    this.panels[worldItem.Name] = bp;
                     Log.Debug($"attached to {worldItem}.");
                 }
                 catch (Exception ex)
@@ -415,7 +417,7 @@ namespace Breakdown
                     return Vector3.Distance(entityPos, GetDistrictPosition(keyDistrict));
                 })
                 .ThenByDescending(x => x.count.refs)
-                .Take(15)
+                .Take(this.districtsNotSegments ? 15 : 25)
                 .ToArray();
 
             var prefixes    = new string[ranked.Length];
@@ -457,7 +459,7 @@ namespace Breakdown
                 {
                     if (panel != null)
                     {
-                        panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowShowBoth);
+                        panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowShowBoth, this.districtsNotSegments);
                     }
                 }
             };
@@ -555,6 +557,12 @@ namespace Breakdown
                     yield return new PathCount() { from = fromCount.Key, to = toCount.Key, count = toCount.Value };
                 }
             }
+        }
+
+        private void ToggleDistrictsRoads()
+        {
+            this.districtsNotSegments = !this.districtsNotSegments;
+            this.lastRefreshFrame = 0;
         }
 
         private static string GetSelectedDistrict(InstanceID instance)
