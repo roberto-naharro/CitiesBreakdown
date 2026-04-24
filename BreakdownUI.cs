@@ -156,7 +156,7 @@ namespace Breakdown
 
         public void SetTopTen(string[] prefixes, string[] froms, Color32[] fromColors,
             string[] tos, Color32[] toColors, string[] tags, string[] counts, bool[] rowShowBoth,
-            bool districtsMode = true, Color32[] countColors = null)
+            bool districtsMode = true, Color32[] countColors = null, string[] tooltips = null)
         {
             if (_rows == null) return;
 
@@ -207,10 +207,13 @@ namespace Breakdown
                     _countLabels[i].isVisible = counts[i] != string.Empty;
 
                     _rows[i].isVisible = true;
+                    _rows[i].tooltip   = (tooltips != null && i < tooltips.Length && tooltips[i] != null)
+                        ? tooltips[i] : string.Empty;
                 }
                 else
                 {
                     _rows[i].isVisible = false;
+                    _rows[i].tooltip   = string.Empty;
                 }
             }
             this.isVisible = froms.Length > 0;

@@ -17,6 +17,7 @@ namespace Breakdown
         public string  name;
         public Color32 color;
         public uint    routes;
+        public string  tooltip;
     }
 
     public class UIBreakdownAccordionPanel : UIPanel
@@ -227,10 +228,12 @@ namespace Breakdown
                             _connNames[i][j].text      = c.name;
                             _connNames[i][j].textColor = c.color;
                             _connCounts[i][j].text     = c.routes == 1 ? "(1)" : $"({c.routes})";
+                            _connRows[i][j].tooltip    = c.tooltip ?? string.Empty;
                             _connRows[i][j].isVisible  = true;
                         }
                         else
                         {
+                            _connRows[i][j].tooltip   = string.Empty;
                             _connRows[i][j].isVisible = false;
                         }
                     }

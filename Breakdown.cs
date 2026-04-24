@@ -75,6 +75,54 @@ namespace Breakdown
         private int _cityWideRefreshFrame = 0;
         private bool _wasPopupOpen = false;
 
+        // Route-type tooltip labels — read from traffic routes panel checkboxes at init time
+        private string _labelPedestrian  = "Pedestrians";
+        private string _labelCyclists    = "Cyclists";
+        private string _labelPrivate     = "Private Vehicles";
+        private string _labelTrucks      = "Trucks";
+        private string _labelPublicTrans = "Public Transport";
+        private string _labelServices    = "City Services";
+
+        // Categorize a path by its owner InstanceID using the same 6 groups as PathVisualizer
+        // (Pedestrians, Cyclists, Private, Trucks, Public Transport, City Services).
+        // Mirrors the filter logic in PathVisualizer.SimulationStep / AddInstance.
+        private static uint GetInstanceCategory(InstanceID id)
+        {
+            if (id.Vehicle != 0)
+            {
+                var info = VehicleManager.instance.m_vehicles.m_buffer[id.Vehicle].Info;
+                if (info == null || info.m_class == null) return 2;
+                switch (info.m_class.m_service)
+                {
+                    case ItemClass.Service.Residential:  return 2; // Private Vehicles
+                    case ItemClass.Service.Industrial:
+                    case ItemClass.Service.PlayerIndustry: return 3; // Trucks
+                    case ItemClass.Service.PublicTransport: return 4; // Public Transport
+                    case ItemClass.Service.Fishing:
+                        if (info.m_vehicleAI is FishingBoatAI) return 4;
+                        return 3;
+                    default: return 5; // City Services
+                }
+            }
+            if (id.CitizenInstance != 0)
+            {
+                var cm = CitizenManager.instance;
+                uint citizenId = cm.m_instances.m_buffer[id.CitizenInstance].m_citizen;
+                if (citizenId != 0)
+                {
+                    ushort vehicleId = cm.m_citizens.m_buffer[(int)citizenId].m_vehicle;
+                    if (vehicleId != 0)
+                    {
+                        var vInfo = VehicleManager.instance.m_vehicles.m_buffer[vehicleId].Info;
+                        if (vInfo != null && (uint)vInfo.m_vehicleType == 32) return 1; // Cyclists
+                        return 2; // In non-bicycle vehicle (PathVisualizer skips these)
+                    }
+                }
+                return 0; // Pedestrians (on foot)
+            }
+            return 2;
+        }
+
         private volatile bool _findRoutesPending = false;
         private volatile bool _pendingResultReady = false;
         private Action _pendingUIUpdate;
@@ -397,6 +445,29 @@ namespace Breakdown
                 }
             }
             Log.Debug($"InitUI done, {panels.Count} panels attached.");
+            InitRouteTypeLabels();
+        }
+
+        private void InitRouteTypeLabels()
+        {
+            var obj = GameObject.Find("(Library) TrafficRoutesInfoViewPanel");
+            if (obj == null) { Log.Debug("InitRouteTypeLabels: panel not found"); return; }
+            foreach (var cb in obj.GetComponentsInChildren<UICheckBox>(true))
+            {
+                string text = cb.text;
+                if (string.IsNullOrEmpty(text)) continue;
+                // Actual names from TrafficRoutesInfoViewPanel.InitCheckBoxes IL
+                switch (cb.name)
+                {
+                    case "CheckboxPedestrians":        _labelPedestrian  = text; break;
+                    case "CheckboxCyclists":           _labelCyclists    = text; break;
+                    case "CheckboxPirateVehicles":     _labelPrivate     = text; break; // "Pirate" is a typo in the original game code
+                    case "CheckboxTrucks":             _labelTrucks      = text; break;
+                    case "CheckboxPublicTransport":    _labelPublicTrans = text; break;
+                    case "CheckboxCityServiceVehicles": _labelServices   = text; break;
+                }
+            }
+            Log.Debug($"Route labels: {_labelPedestrian} | {_labelCyclists} | {_labelPrivate} | {_labelTrucks} | {_labelPublicTrans} | {_labelServices}");
         }
 
         private void InitAccordionUI()
@@ -453,12 +524,19 @@ namespace Breakdown
 
             var tails = pathBuffer.GetPathTails(bufferSize);
 
-            HashSet<uint> heads;
+            // Map each path's head unit index → the InstanceID that owns it
+            // so FollowRoutes can classify by vehicle service / citizen bike status.
+            var headToInstance = new Dictionary<uint, InstanceID>();
             try
             {
                 lock (pathDict)
                 {
-                    heads = new HashSet<uint>(pathDict.Select(x => x.Value.m_pathUnit).Select(x => GetHead(x, tails)));
+                    foreach (var kv in pathDict)
+                    {
+                        uint head = GetHead(kv.Value.m_pathUnit, tails);
+                        if (head > 0 && !headToInstance.ContainsKey(head))
+                            headToInstance[head] = kv.Key;
+                    }
                 }
             }
             catch (InvalidOperationException)
@@ -467,9 +545,9 @@ namespace Breakdown
                 return;
             }
 
-            Log.Debug($"FindRoutes tails={tails.Count} heads={heads.Count} pathDict={pathDict.Count} elapsed={sw.ElapsedMilliseconds}ms");
+            Log.Debug($"FindRoutes tails={tails.Count} heads={headToInstance.Count} pathDict={pathDict.Count} elapsed={sw.ElapsedMilliseconds}ms");
 
-            this.FollowRoutes(pathBuffer, bufferSize, heads, tails, this.districtsNotSegments);
+            this.FollowRoutes(pathBuffer, bufferSize, headToInstance, tails, this.districtsNotSegments);
 
             sw.Reset();
             sw.Start();
@@ -553,8 +631,9 @@ namespace Breakdown
                     rowShowBoth[i] = true;
                 }
             }
-            var tags   = ranked.Select(x => SameTag(x.from, x.to)).ToArray();
-            var counts = ranked.Select(x => showCount ? x.FormatCount() : string.Empty).ToArray();
+            var tags     = ranked.Select(x => SameTag(x.from, x.to)).ToArray();
+            var counts   = ranked.Select(x => showCount ? x.FormatCount() : string.Empty).ToArray();
+            var tooltips = ranked.Select(x => BuildTooltip(x.count)).ToArray();
             Log.Debug($"built {froms.Length} display entries in {sw.ElapsedMilliseconds}ms");
 
             _pendingUIUpdate = () =>
@@ -563,7 +642,7 @@ namespace Breakdown
                 {
                     if (panel != null)
                     {
-                        panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowShowBoth, this.districtsNotSegments, countColors);
+                        panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowShowBoth, this.districtsNotSegments, countColors, tooltips);
                     }
                 }
             };
@@ -592,8 +671,40 @@ namespace Breakdown
 
             var tails = pathBuffer.GetPathTails(bufferSize);
 
-            // Pass null heads = scan every active head in the full buffer (city-wide mode)
-            this.FollowRoutes(pathBuffer, bufferSize, null, tails, true);
+            // Build a complete head→InstanceID map by scanning all active vehicles and citizens.
+            // This enables per-category breakdown in the accordion tooltips.
+            var allHeadToInstance = new Dictionary<uint, InstanceID>();
+            var vm = VehicleManager.instance;
+            int vmSize = (int)vm.m_vehicles.m_size;
+            for (int i = 1; i < vmSize; i++)
+            {
+                uint pathUnit = vm.m_vehicles.m_buffer[i].m_path;
+                if (pathUnit == 0) continue;
+                uint head = GetHead(pathUnit, tails);
+                if (head > 0 && !allHeadToInstance.ContainsKey(head))
+                {
+                    var id = InstanceID.Empty;
+                    id.Vehicle = (ushort)i;
+                    allHeadToInstance[head] = id;
+                }
+            }
+            var cm = CitizenManager.instance;
+            int cmSize = (int)cm.m_instances.m_size;
+            for (int i = 1; i < cmSize; i++)
+            {
+                uint pathUnit = cm.m_instances.m_buffer[i].m_path;
+                if (pathUnit == 0) continue;
+                uint head = GetHead(pathUnit, tails);
+                if (head > 0 && !allHeadToInstance.ContainsKey(head))
+                {
+                    var id = InstanceID.Empty;
+                    id.CitizenInstance = (ushort)i;
+                    allHeadToInstance[head] = id;
+                }
+            }
+            Log.Debug($"FindCityWideRoutes: reverse map={allHeadToInstance.Count}");
+
+            this.FollowRoutes(pathBuffer, bufferSize, allHeadToInstance, tails, true);
 
             var sections = BuildDistrictSections();
             Log.Debug($"FindCityWideRoutes done, {sections.Length} sections");
@@ -607,15 +718,15 @@ namespace Breakdown
 
         private readonly HashSet<uint> _loopCheckBuffer = new HashSet<uint>();
 
-        private void FollowRoutes(PathUnit[] pathBuffer, int bufferSize, HashSet<uint> heads, Dictionary<uint, uint> tails, bool useDistricts)
+        private void FollowRoutes(PathUnit[] pathBuffer, int bufferSize, Dictionary<uint, InstanceID> headToInstance, Dictionary<uint, uint> tails, bool useDistricts)
         {
             int headCount = 0;
             var sw = new Stopwatch();
             sw.Start();
-            Log.Debug($"FollowRoutes scanning {bufferSize} buffer slots, heads={(heads != null ? heads.Count.ToString() : "ALL")}");
+            Log.Debug($"FollowRoutes scanning {bufferSize} buffer slots, heads={(headToInstance != null ? headToInstance.Count.ToString() : "ALL")}");
             for (int index = 0; index < bufferSize; index++)
             {
-                if (heads != null && !heads.Contains((uint)index)) continue;
+                if (headToInstance != null && !headToInstance.ContainsKey((uint)index)) continue;
                 if (tails.ContainsKey((uint)index)) continue;
 
                 var path = pathBuffer[index];
@@ -659,6 +770,24 @@ namespace Breakdown
 
                 this.AddPath(first, last, segmentCount, pathLength,
                     path.m_laneTypes, path.m_pathFindFlags, path.m_referenceCount, (byte)path.m_simulationFlags, path.m_speed, path.m_vehicleTypes);
+
+                if (headToInstance != null)
+                {
+                    InstanceID id;
+                    if (headToInstance.TryGetValue((uint)index, out id))
+                    {
+                        var detail = this.pathCounts[first][last];
+                        switch (GetInstanceCategory(id))
+                        {
+                            case 0: detail.catPedestrian++; break;
+                            case 1: detail.catCyclists++;   break;
+                            case 3: detail.catTrucks++;     break;
+                            case 4: detail.catPublic++;     break;
+                            case 5: detail.catServices++;   break;
+                            default: detail.catPrivate++;   break;
+                        }
+                    }
+                }
             }
             Log.Debug($"FollowRoutes processed {headCount} heads in {sw.ElapsedMilliseconds}ms");
         }
@@ -699,37 +828,47 @@ namespace Breakdown
 
         private DistrictSection[] BuildDistrictSections()
         {
-            // Merge A→B and B→A into a single (min,max) keyed pair
-            var merged = new Dictionary<string, Dictionary<string, uint>>();
-            foreach (var fromKv in this.pathCounts)
-            {
-                foreach (var toKv in fromKv.Value)
-                {
-                    string a = fromKv.Key, b = toKv.Key;
-                    if (string.Compare(a, b, StringComparison.Ordinal) > 0) { var tmp = a; a = b; b = tmp; }
-                    if (!merged.ContainsKey(a)) merged[a] = new Dictionary<string, uint>();
-                    if (!merged[a].ContainsKey(b)) merged[a][b] = 0;
-                    merged[a][b] += toKv.Value.refs;
-                }
-            }
-
-            // Accumulate per-district totals and connection lists
             var totals      = new Dictionary<string, uint>();
             var connections = new Dictionary<string, List<ConnectionData>>();
-            foreach (var aKv in merged)
+            var processed   = new HashSet<string>();
+
+            foreach (var fromKv in this.pathCounts)
             {
-                foreach (var bKv in aKv.Value)
+                string a = fromKv.Key;
+                foreach (var toKv in fromKv.Value)
                 {
-                    string a = aKv.Key, b = bKv.Key;
-                    if (a == b) continue; // skip same-district paths (avoids self-connection duplication)
-                    uint   n = bKv.Value;
+                    string b = toKv.Key;
+                    if (a == b) continue;
+
+                    // Canonical pair key so A↔B is processed once regardless of direction
+                    string pairKey = string.Compare(a, b, StringComparison.Ordinal) < 0
+                        ? a + "" + b : b + "" + a;
+                    if (processed.Contains(pairKey)) continue;
+                    processed.Add(pairKey);
+
+                    PathDetails dAB = toKv.Value;
+                    PathDetails dBA = null;
+                    Dictionary<string, PathDetails> bDict;
+                    if (this.pathCounts.TryGetValue(b, out bDict)) bDict.TryGetValue(a, out dBA);
+
+                    uint n = dAB.refs + (dBA != null ? dBA.refs : 0);
+                    if (n == 0) continue;
+
+                    uint catPed  = dAB.catPedestrian + (dBA != null ? dBA.catPedestrian : 0);
+                    uint catCyc  = dAB.catCyclists   + (dBA != null ? dBA.catCyclists   : 0);
+                    uint catPriv = dAB.catPrivate     + (dBA != null ? dBA.catPrivate    : 0);
+                    uint catTrk  = dAB.catTrucks      + (dBA != null ? dBA.catTrucks     : 0);
+                    uint catPub  = dAB.catPublic      + (dBA != null ? dBA.catPublic     : 0);
+                    uint catSvc  = dAB.catServices    + (dBA != null ? dBA.catServices   : 0);
+
+                    string tip = BuildConnectionTooltip(catPed, catCyc, catPriv, catTrk, catPub, catSvc);
 
                     if (!totals.ContainsKey(a)) { totals[a] = 0; connections[a] = new List<ConnectionData>(); }
                     if (!totals.ContainsKey(b)) { totals[b] = 0; connections[b] = new List<ConnectionData>(); }
                     totals[a] += n;
                     totals[b] += n;
-                    connections[a].Add(new ConnectionData { name = b, color = GetDistrictColor(b), routes = n });
-                    connections[b].Add(new ConnectionData { name = a, color = GetDistrictColor(a), routes = n });
+                    connections[a].Add(new ConnectionData { name = b, color = GetDistrictColor(b), routes = n, tooltip = tip });
+                    connections[b].Add(new ConnectionData { name = a, color = GetDistrictColor(a), routes = n, tooltip = tip });
                 }
             }
 
@@ -748,6 +887,31 @@ namespace Breakdown
                         .ToArray()
                 })
                 .ToArray();
+        }
+
+        private string BuildConnectionTooltip(uint catPed, uint catCyc, uint catPriv, uint catTrk, uint catPub, uint catSvc)
+        {
+            var lines = new List<string>(6);
+            if (catPed  > 0) lines.Add($"{_labelPedestrian}: {catPed}");
+            if (catCyc  > 0) lines.Add($"{_labelCyclists}: {catCyc}");
+            if (catPriv > 0) lines.Add($"{_labelPrivate}: {catPriv}");
+            if (catTrk  > 0) lines.Add($"{_labelTrucks}: {catTrk}");
+            if (catPub  > 0) lines.Add($"{_labelPublicTrans}: {catPub}");
+            if (catSvc  > 0) lines.Add($"{_labelServices}: {catSvc}");
+            return lines.Count > 0 ? string.Join("\n", lines.ToArray()) : null;
+        }
+
+        private string BuildTooltip(PathDetails count)
+        {
+            if (count == null || count.refs == 0) return null;
+            var lines = new List<string>(6);
+            if (count.catPedestrian > 0) lines.Add($"{_labelPedestrian}: {count.catPedestrian}");
+            if (count.catCyclists   > 0) lines.Add($"{_labelCyclists}: {count.catCyclists}");
+            if (count.catPrivate    > 0) lines.Add($"{_labelPrivate}: {count.catPrivate}");
+            if (count.catTrucks     > 0) lines.Add($"{_labelTrucks}: {count.catTrucks}");
+            if (count.catPublic     > 0) lines.Add($"{_labelPublicTrans}: {count.catPublic}");
+            if (count.catServices   > 0) lines.Add($"{_labelServices}: {count.catServices}");
+            return lines.Count > 0 ? string.Join("\n", lines.ToArray()) : null;
         }
 
         private void ToggleDistrictsRoads()
@@ -807,6 +971,13 @@ namespace Breakdown
     public class PathDetails
     {
         public uint refs = 0;
+        // Per-category route counts for the hover tooltip (same order as traffic-routes panel)
+        public uint catPedestrian = 0;
+        public uint catCyclists   = 0;
+        public uint catPrivate    = 0;
+        public uint catTrucks     = 0;
+        public uint catPublic     = 0;
+        public uint catServices   = 0;
         public Counts<ushort> segments = new Counts<ushort>();
         public Counts<float> length = new Counts<float>();
         public Counts<byte> laneTypes = new Counts<byte>();
