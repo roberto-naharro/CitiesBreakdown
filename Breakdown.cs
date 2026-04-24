@@ -63,7 +63,8 @@ namespace Breakdown
         private readonly Dictionary<string, float>   _districtHues   = new Dictionary<string, float>();
         private int _nextColorIndex = 0;
 
-        private readonly Dictionary<ushort, string> _nearestDistrictCache = new Dictionary<ushort, string>();
+        private readonly Dictionary<ushort, string>  _nearestDistrictCache = new Dictionary<ushort, string>();
+        private readonly Dictionary<string, Vector3> _districtPositions    = new Dictionary<string, Vector3>();
         private byte _cachedDistrictCount = 0;
         private int  _districtCheckFrame  = 0;
 
@@ -110,7 +111,12 @@ namespace Breakdown
                 return "Out of town";
             byte districtId = pos.GetDistrict();
             if (districtId != 0)
-                return districtId.GetDistrictName();
+            {
+                string distName = districtId.GetDistrictName();
+                if (!_districtPositions.ContainsKey(distName))
+                    _districtPositions[distName] = DistrictManager.instance.m_districts.m_buffer[districtId].m_nameLocation;
+                return distName;
+            }
 
             string cached;
             if (_nearestDistrictCache.TryGetValue(segmentId, out cached))
@@ -118,17 +124,59 @@ namespace Breakdown
 
             var dm = DistrictManager.instance;
             string nearest = null;
+            Vector3 nearestPos = Vector3.zero;
             float bestDist = float.MaxValue;
             for (int i = 1; i < 128; i++)
             {
                 var district = dm.m_districts.m_buffer[i];
                 if ((district.m_flags & District.Flags.Created) == 0) continue;
                 float d = Vector3.Distance(pos, district.m_nameLocation);
-                if (d < bestDist) { bestDist = d; nearest = dm.GetDistrictName((byte)i); }
+                if (d < bestDist) { bestDist = d; nearest = dm.GetDistrictName((byte)i); nearestPos = district.m_nameLocation; }
             }
             string result = nearest != null ? "near " + nearest : "No district";
             _nearestDistrictCache[segmentId] = result;
+            if (nearest != null && !_districtPositions.ContainsKey(nearest))
+                _districtPositions[nearest] = nearestPos;
             return result;
+        }
+
+        private Vector3 GetDistrictPosition(string name)
+        {
+            if (name == "Out of town" || name == "No district")
+                return new Vector3(float.MaxValue, 0, float.MaxValue);
+            string baseKey = name.StartsWith("near ") ? name.Substring(5) : name;
+            Vector3 pos;
+            if (_districtPositions.TryGetValue(baseKey, out pos))
+                return pos;
+            var dm = DistrictManager.instance;
+            for (int i = 1; i < 128; i++)
+            {
+                var district = dm.m_districts.m_buffer[i];
+                if ((district.m_flags & District.Flags.Created) == 0) continue;
+                if (dm.GetDistrictName((byte)i) == baseKey)
+                {
+                    _districtPositions[baseKey] = district.m_nameLocation;
+                    return district.m_nameLocation;
+                }
+            }
+            return new Vector3(float.MaxValue, 0, float.MaxValue);
+        }
+
+        private static Vector3 GetEntityPosition(InstanceID instance)
+        {
+            switch (instance.Type)
+            {
+                case InstanceType.Building:
+                    return BuildingManager.instance.m_buildings.m_buffer[instance.Building].m_position;
+                case InstanceType.District:
+                    return DistrictManager.instance.m_districts.m_buffer[instance.District].m_nameLocation;
+                case InstanceType.NetNode:
+                    return NetManager.instance.m_nodes.m_buffer[instance.NetNode].m_position;
+                case InstanceType.NetSegment:
+                    return NetManager.instance.m_segments.m_buffer[instance.NetSegment].m_middlePosition;
+                default:
+                    return Vector3.zero;
+            }
         }
 
         private static Color32 HsvToColor32(float h, float s, float v)
@@ -206,6 +254,7 @@ namespace Breakdown
                     {
                         _cachedDistrictCount = count;
                         _nearestDistrictCache.Clear();
+                        _districtPositions.Clear();
                     }
                 }
 
@@ -329,9 +378,24 @@ namespace Breakdown
             sw.Start();
             bool showCount = instance.Type != InstanceType.Vehicle && instance.Type != InstanceType.Citizen;
             string selectedDistrict = GetSelectedDistrict(instance);
+            Vector3 entityPos = GetEntityPosition(instance);
 
             var ranked = this.GetPathCounts()
-                .OrderBy(x => RoutePriority(x.from, x.to))
+                .OrderBy(x =>
+                {
+                    string keyDistrict;
+                    if (selectedDistrict != null && x.to == selectedDistrict)
+                        keyDistrict = x.from;
+                    else if (selectedDistrict != null && x.from == selectedDistrict)
+                        keyDistrict = x.to;
+                    else
+                    {
+                        float df = Vector3.Distance(entityPos, GetDistrictPosition(x.from));
+                        float dt = Vector3.Distance(entityPos, GetDistrictPosition(x.to));
+                        return Math.Min(df, dt);
+                    }
+                    return Vector3.Distance(entityPos, GetDistrictPosition(keyDistrict));
+                })
                 .ThenByDescending(x => x.count.refs)
                 .Take(10)
                 .ToArray();
@@ -490,13 +554,6 @@ namespace Breakdown
             if (from == "Out of town" || from == "No district") return null;
             if (from.StartsWith("near ")) return null;
             return "(same district)";
-        }
-
-        private static int RoutePriority(string from, string to)
-        {
-            if (from == "Out of town" || to == "Out of town") return 0;
-            if (from == "No district" || to == "No district") return 1;
-            return 2;
         }
 
         private uint GetHead(uint start, Dictionary<uint, uint> tails)
