@@ -6,10 +6,7 @@ namespace Breakdown
 {
     public class UIBreakdownPanel : UIPanel
     {
-        private const int RowCount    = 25;
-        private const float TextScale = 0.7f;
-        private static readonly Color32 MutedColor  = new Color32(160, 160, 160, 255);
-        private static readonly Color32 ActiveColor = new Color32(255, 255, 255, 255);
+        private const int RowCount = 25;
 
         private UIButton _districtsButton;
         private UIButton _roadsButton;
@@ -38,7 +35,7 @@ namespace Breakdown
         {
             base.Start();
             this.backgroundSprite = "GenericPanel";
-            this.color = new Color32(20, 20, 20, 235);
+            this.color = BreakdownStyle.BgColor;
             this.relativePosition = new Vector3(parent.width, 0);
             parent.eventSizeChanged += (c, v) => { this.relativePosition = new Vector3(parent.width, 0); };
             this.name = "BreakdownModPanel";
@@ -56,9 +53,9 @@ namespace Breakdown
 
             _districtsButton = header.AddUIComponent<UIButton>();
             _districtsButton.text = "Districts";
-            _districtsButton.textScale = TextScale;
-            _districtsButton.textColor = ActiveColor;
-            _districtsButton.hoveredTextColor = ActiveColor;
+            _districtsButton.textScale = BreakdownStyle.TextScale;
+            _districtsButton.textColor = BreakdownStyle.ActiveColor;
+            _districtsButton.hoveredTextColor = BreakdownStyle.ActiveColor;
             _districtsButton.normalBgSprite = "ButtonSmall";
             _districtsButton.hoveredBgSprite = "ButtonSmallHovered";
             _districtsButton.pressedBgSprite = "ButtonSmallPressed";
@@ -76,9 +73,9 @@ namespace Breakdown
 
             _roadsButton = header.AddUIComponent<UIButton>();
             _roadsButton.text = "Roads";
-            _roadsButton.textScale = TextScale;
-            _roadsButton.textColor = MutedColor;
-            _roadsButton.hoveredTextColor = ActiveColor;
+            _roadsButton.textScale = BreakdownStyle.TextScale;
+            _roadsButton.textColor = BreakdownStyle.MutedColor;
+            _roadsButton.hoveredTextColor = BreakdownStyle.ActiveColor;
             _roadsButton.normalBgSprite = "";
             _roadsButton.hoveredBgSprite = "ButtonSmallHovered";
             _roadsButton.pressedBgSprite = "ButtonSmallPressed";
@@ -113,35 +110,35 @@ namespace Breakdown
                 _rows[i].isVisible = false;
 
                 _prefixLabels[i] = _rows[i].AddUIComponent<UILabel>();
-                _prefixLabels[i].textColor = MutedColor;
-                _prefixLabels[i].textScale = TextScale;
+                _prefixLabels[i].textColor = BreakdownStyle.MutedColor;
+                _prefixLabels[i].textScale = BreakdownStyle.TextScale;
                 _prefixLabels[i].padding = new RectOffset(8, 2, 4, 4);
                 _prefixLabels[i].isVisible = false;
 
                 _fromLabels[i] = _rows[i].AddUIComponent<UILabel>();
-                _fromLabels[i].textScale = TextScale;
+                _fromLabels[i].textScale = BreakdownStyle.TextScale;
                 _fromLabels[i].padding = new RectOffset(8, 4, 4, 4);
 
                 _arrowLabels[i] = _rows[i].AddUIComponent<UILabel>();
                 _arrowLabels[i].text = "→";
-                _arrowLabels[i].textColor = MutedColor;
-                _arrowLabels[i].textScale = TextScale;
+                _arrowLabels[i].textColor = BreakdownStyle.MutedColor;
+                _arrowLabels[i].textScale = BreakdownStyle.TextScale;
                 _arrowLabels[i].padding = new RectOffset(0, 4, 4, 4);
                 _arrowLabels[i].isVisible = false;
 
                 _toLabels[i] = _rows[i].AddUIComponent<UILabel>();
-                _toLabels[i].textScale = TextScale;
+                _toLabels[i].textScale = BreakdownStyle.TextScale;
                 _toLabels[i].padding = new RectOffset(0, 4, 4, 4);
                 _toLabels[i].isVisible = false;
 
                 _tagLabels[i] = _rows[i].AddUIComponent<UILabel>();
-                _tagLabels[i].textScale = TextScale;
+                _tagLabels[i].textScale = BreakdownStyle.TextScale;
                 _tagLabels[i].padding = new RectOffset(0, 4, 4, 4);
                 _tagLabels[i].isVisible = false;
 
                 _countLabels[i] = _rows[i].AddUIComponent<UILabel>();
-                _countLabels[i].textColor = MutedColor;
-                _countLabels[i].textScale = TextScale;
+                _countLabels[i].textColor = BreakdownStyle.MutedColor;
+                _countLabels[i].textScale = BreakdownStyle.TextScale;
                 _countLabels[i].padding = new RectOffset(0, 8, 4, 4);
             }
         }
@@ -149,17 +146,17 @@ namespace Breakdown
         private void UpdateToggleState()
         {
             if (_districtsButton == null) return;
-            _districtsButton.textColor       = _districtsMode ? ActiveColor : MutedColor;
+            _districtsButton.textColor       = _districtsMode ? BreakdownStyle.ActiveColor : BreakdownStyle.MutedColor;
             _districtsButton.normalBgSprite  = _districtsMode ? "ButtonSmall" : "";
             _districtsButton.focusedBgSprite = _districtsMode ? "ButtonSmall" : "";
-            _roadsButton.textColor           = _districtsMode ? MutedColor  : ActiveColor;
+            _roadsButton.textColor           = _districtsMode ? BreakdownStyle.MutedColor  : BreakdownStyle.ActiveColor;
             _roadsButton.normalBgSprite      = _districtsMode ? "" : "ButtonSmall";
             _roadsButton.focusedBgSprite     = _districtsMode ? "" : "ButtonSmall";
         }
 
         public void SetTopTen(string[] prefixes, string[] froms, Color32[] fromColors,
             string[] tos, Color32[] toColors, string[] tags, string[] counts, bool[] rowShowBoth,
-            bool districtsMode = true)
+            bool districtsMode = true, Color32[] countColors = null)
         {
             if (_rows == null) return;
 
@@ -205,6 +202,7 @@ namespace Breakdown
                     }
                     _tagLabels[i].isVisible = hasTag;
 
+                    _countLabels[i].textColor = (countColors != null && i < countColors.Length) ? countColors[i] : BreakdownStyle.MutedColor;
                     _countLabels[i].text      = counts[i];
                     _countLabels[i].isVisible = counts[i] != string.Empty;
 

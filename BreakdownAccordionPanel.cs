@@ -23,9 +23,6 @@ namespace Breakdown
     {
         public const int MaxSections    = 12;
         public const int MaxConnections = 8;
-        private const float TextScale   = 0.7f;
-
-        private static readonly Color32 MutedColor = new Color32(160, 160, 160, 255);
 
         private UILabel     _loadingLabel;
         private UIPanel[]   _sections;
@@ -54,7 +51,7 @@ namespace Breakdown
         {
             base.Start();
             this.backgroundSprite            = "GenericPanel";
-            this.color                       = new Color32(20, 20, 20, 235);
+            this.color                       = BreakdownStyle.BgColor;
             this.autoLayout                  = true;
             this.autoLayoutDirection         = LayoutDirection.Vertical;
             this.autoFitChildrenHorizontally = true;
@@ -63,8 +60,8 @@ namespace Breakdown
 
             _loadingLabel = this.AddUIComponent<UILabel>();
             _loadingLabel.text       = "Loading...";
-            _loadingLabel.textColor  = MutedColor;
-            _loadingLabel.textScale  = TextScale;
+            _loadingLabel.textColor  = BreakdownStyle.MutedColor;
+            _loadingLabel.textScale  = BreakdownStyle.TextScale;
             _loadingLabel.padding    = new RectOffset(8, 8, 6, 6);
             _loadingLabel.isInteractive = false;
             _loadingLabel.isVisible  = true;
@@ -103,19 +100,19 @@ namespace Breakdown
 
                 _arrows[i] = _headers[i].AddUIComponent<UILabel>();
                 _arrows[i].text          = "▶";
-                _arrows[i].textColor     = MutedColor;
-                _arrows[i].textScale     = TextScale;
+                _arrows[i].textColor     = BreakdownStyle.MutedColor;
+                _arrows[i].textScale     = BreakdownStyle.TextScale;
                 _arrows[i].padding       = new RectOffset(8, 4, 4, 4);
                 _arrows[i].isInteractive = false;
 
                 _headerNames[i] = _headers[i].AddUIComponent<UILabel>();
-                _headerNames[i].textScale    = TextScale;
+                _headerNames[i].textScale    = BreakdownStyle.TextScale;
                 _headerNames[i].padding      = new RectOffset(0, 4, 4, 4);
                 _headerNames[i].isInteractive = false;
 
                 _headerCounts[i] = _headers[i].AddUIComponent<UILabel>();
-                _headerCounts[i].textColor   = MutedColor;
-                _headerCounts[i].textScale   = TextScale;
+                _headerCounts[i].textColor   = BreakdownStyle.MutedColor;
+                _headerCounts[i].textScale   = BreakdownStyle.TextScale;
                 _headerCounts[i].padding     = new RectOffset(0, 8, 4, 4);
                 _headerCounts[i].isInteractive = false;
 
@@ -143,19 +140,19 @@ namespace Breakdown
 
                     _connArrows[i][j] = _connRows[i][j].AddUIComponent<UILabel>();
                     _connArrows[i][j].text          = "↔";
-                    _connArrows[i][j].textColor     = MutedColor;
-                    _connArrows[i][j].textScale     = TextScale;
+                    _connArrows[i][j].textColor     = BreakdownStyle.MutedColor;
+                    _connArrows[i][j].textScale     = BreakdownStyle.TextScale;
                     _connArrows[i][j].padding       = new RectOffset(20, 4, 3, 3);
                     _connArrows[i][j].isInteractive = false;
 
                     _connNames[i][j] = _connRows[i][j].AddUIComponent<UILabel>();
-                    _connNames[i][j].textScale    = TextScale;
+                    _connNames[i][j].textScale    = BreakdownStyle.TextScale;
                     _connNames[i][j].padding      = new RectOffset(0, 4, 3, 3);
                     _connNames[i][j].isInteractive = false;
 
                     _connCounts[i][j] = _connRows[i][j].AddUIComponent<UILabel>();
-                    _connCounts[i][j].textColor   = MutedColor;
-                    _connCounts[i][j].textScale   = TextScale;
+                    _connCounts[i][j].textColor   = BreakdownStyle.MutedColor;
+                    _connCounts[i][j].textScale   = BreakdownStyle.TextScale;
                     _connCounts[i][j].padding     = new RectOffset(0, 8, 3, 3);
                     _connCounts[i][j].isInteractive = false;
                 }

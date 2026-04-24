@@ -478,38 +478,51 @@ namespace Breakdown
             Vector3 entityPos = GetEntityPosition(instance);
 
             bool sortByCount = instance.Type == InstanceType.NetSegment || instance.Type == InstanceType.NetNode;
-            int takeCount = this.districtsNotSegments ? 15 : 25;
 
             PathCount[] ranked;
             if (sortByCount)
             {
                 ranked = this.GetPathCounts()
                     .OrderByDescending(x => x.count.refs)
-                    .Take(takeCount)
+                    .Take(25)
                     .ToArray();
             }
             else
             {
-                ranked = this.GetPathCounts()
-                    .OrderBy(x =>
-                    {
-                        string keyDistrict;
-                        if (selectedDistrict != null && x.to == selectedDistrict)
-                            keyDistrict = x.from;
-                        else if (selectedDistrict != null && x.from == selectedDistrict)
-                            keyDistrict = x.to;
-                        else
-                        {
-                            float df = Vector3.Distance(entityPos, GetDistrictPosition(x.from));
-                            float dt = Vector3.Distance(entityPos, GetDistrictPosition(x.to));
-                            return (float.IsInfinity(df) || float.IsInfinity(dt)) ? float.MaxValue : Math.Min(df, dt);
-                        }
-                        return Vector3.Distance(entityPos, GetDistrictPosition(keyDistrict));
-                    })
-                    .ThenByDescending(x => x.count.refs)
-                    .Take(takeCount)
+                Func<PathCount, float> distFn = x =>
+                {
+                    if (selectedDistrict != null && x.to == selectedDistrict)
+                        return Vector3.Distance(entityPos, GetDistrictPosition(x.from));
+                    if (selectedDistrict != null && x.from == selectedDistrict)
+                        return Vector3.Distance(entityPos, GetDistrictPosition(x.to));
+                    float df = Vector3.Distance(entityPos, GetDistrictPosition(x.from));
+                    float dt = Vector3.Distance(entityPos, GetDistrictPosition(x.to));
+                    return (float.IsInfinity(df) || float.IsInfinity(dt)) ? float.MaxValue : Math.Min(df, dt);
+                };
+
+                // Precompute distances once per item
+                var allByDist = this.GetPathCounts()
+                    .Select(x => new { pc = x, dist = distFn(x) })
+                    .OrderBy(x => x.dist)
+                    .ThenByDescending(x => x.pc.count.refs)
+                    .ToList();
+
+                // High-traffic entries always shown (up to 15); normal entries fill remaining slots
+                var highTraffic = allByDist.Where(x => x.pc.count.refs > 10).ToList();
+                var normal      = allByDist.Where(x => x.pc.count.refs <= 10).ToList();
+                int highCount   = Math.Min(highTraffic.Count, 15);
+
+                ranked = highTraffic.Take(highCount)
+                    .Concat(normal.Take(15 - highCount))
+                    .OrderBy(x => x.dist)
+                    .Select(x => x.pc)
                     .ToArray();
             }
+
+            var countColors = ranked.Select(x =>
+                x.count.refs > 15 ? BreakdownStyle.AlertColor :
+                x.count.refs > 10 ? BreakdownStyle.WarnColor  :
+                BreakdownStyle.MutedColor).ToArray();
 
             var prefixes    = new string[ranked.Length];
             var froms       = new string[ranked.Length];
@@ -550,7 +563,7 @@ namespace Breakdown
                 {
                     if (panel != null)
                     {
-                        panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowShowBoth, this.districtsNotSegments);
+                        panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowShowBoth, this.districtsNotSegments, countColors);
                     }
                 }
             };
