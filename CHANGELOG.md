@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/roberto-naharro/CitiesBreakdown/compare/v1.0.1...v1.1.0) (2026-04-25)
+
+
+### Features
+
+* add total routes summary and update UI to display totals in BreakdownMod ([d2a90c5](https://github.com/roberto-naharro/CitiesBreakdown/commit/d2a90c56a933ff962dd42a5d28e6e59cba0e1df2))
+* enhance city-wide route processing and UI updates with category filtering ([e41f9f6](https://github.com/roberto-naharro/CitiesBreakdown/commit/e41f9f6c81d5ba762b9606679174c983fd7169f5))
+
 ## [1.0.1](https://github.com/roberto-naharro/CitiesBreakdown/compare/v1.0.0...v1.0.1) (2026-04-25)
 
 
