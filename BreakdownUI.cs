@@ -12,6 +12,8 @@ namespace Breakdown
         private UIButton _roadsButton;
         private UIButton _averageButton;
 
+        private UILabel    _totalLabel;
+
         private UIPanel[]  _rows;
         private UILabel[]  _prefixLabels;
         private UILabel[]  _fromLabels;
@@ -122,6 +124,15 @@ namespace Breakdown
                 // UpdateAverageState(true) will be called by ToggleAverageMode to sync visuals
             };
 
+            // ── Total summary row ────────────────────────────────────────────
+            _totalLabel = this.AddUIComponent<UILabel>();
+            _totalLabel.textScale     = BreakdownStyle.TextScale;
+            _totalLabel.textColor     = BreakdownStyle.MutedColor;
+            _totalLabel.padding       = new RectOffset(8, 8, 2, 2);
+            _totalLabel.autoSize      = true;
+            _totalLabel.isInteractive = true;
+            _totalLabel.text          = string.Empty;
+
             // ── Data rows ────────────────────────────────────────────────────
             _rows         = new UIPanel[RowCount];
             _prefixLabels = new UILabel[RowCount];
@@ -206,9 +217,16 @@ namespace Breakdown
 
         public void SetTopTen(string[] prefixes, string[] froms, Color32[] fromColors,
             string[] tos, Color32[] toColors, string[] tags, string[] counts, bool[] rowShowBoth,
-            bool districtsMode = true, Color32[] countColors = null, string[] tooltips = null)
+            bool districtsMode = true, Color32[] countColors = null, string[] tooltips = null,
+            string totalText = null, string totalTooltip = null)
         {
             if (_rows == null) return;
+
+            if (_totalLabel != null)
+            {
+                _totalLabel.text    = totalText ?? string.Empty;
+                _totalLabel.tooltip = totalTooltip ?? string.Empty;
+            }
 
             if (districtsMode != _districtsMode)
             {

@@ -624,6 +624,20 @@ namespace Breakdown
                     .ToArray();
             }
 
+            uint totalRoutes = 0, totPed = 0, totCyc = 0, totPriv = 0, totTrk = 0, totPub = 0, totSvc = 0;
+            foreach (var pc in this.GetPathCounts())
+            {
+                totalRoutes += pc.count.refs;
+                totPed  += pc.count.catPedestrian;
+                totCyc  += pc.count.catCyclists;
+                totPriv += pc.count.catPrivate;
+                totTrk  += pc.count.catTrucks;
+                totPub  += pc.count.catPublic;
+                totSvc  += pc.count.catServices;
+            }
+            string totalText    = $"Total routes: {totalRoutes}";
+            string totalTooltip = BuildConnectionTooltip(totPed, totCyc, totPriv, totTrk, totPub, totSvc);
+
             var countColors = ranked.Select(x =>
                 x.count.refs > 15 ? BreakdownStyle.AlertColor :
                 x.count.refs > 10 ? BreakdownStyle.WarnColor  :
@@ -659,7 +673,7 @@ namespace Breakdown
                 {
                     if (panel != null)
                     {
-                        panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowShowBoth, this.districtsNotSegments, countColors, tooltips);
+                        panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowShowBoth, this.districtsNotSegments, countColors, tooltips, totalText, totalTooltip);
                     }
                 }
             };
@@ -999,6 +1013,7 @@ namespace Breakdown
             }
             rows.Sort((a, b) => b.entry.ema.CompareTo(a.entry.ema));
 
+            string avgTotalText = $"Tracking {rows.Count} pairs (avg)";
             int take = Math.Min(rows.Count, 25);
             var prefixes    = new string[take];
             var froms       = new string[take];
@@ -1033,7 +1048,7 @@ namespace Breakdown
                 foreach (var panel in this.panels.Values)
                     if (panel != null)
                         panel.SetTopTen(prefixes, froms, fromColors, tos, toColors, tags, counts, rowBoth,
-                            this.districtsNotSegments, countColors, tooltips);
+                            this.districtsNotSegments, countColors, tooltips, avgTotalText);
             };
             _pendingResultReady = true;
         }
