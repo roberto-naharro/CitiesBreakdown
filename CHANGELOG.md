@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/roberto-naharro/CitiesBreakdown/compare/v1.0.0...v1.0.1) (2026-04-25)
+
+
+### Bug Fixes
+
+* update compatibility information for Cities: Skylines to version 1.21.1-f9 ([9b22f4f](https://github.com/roberto-naharro/CitiesBreakdown/commit/9b22f4f04c45e0a10fc261b79cbae748f58294a8))
+
 ## [1.0.0](https://github.com/roberto-naharro/CitiesBreakdown/compare/v0.0.1...v1.0.0) (2026-04-25)
 
 
