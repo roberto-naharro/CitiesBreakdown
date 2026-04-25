@@ -1,0 +1,43 @@
+[h1]Breakdown Revisited[/h1]
+
+See where your city's traffic actually comes from. Click any building, road, vehicle, or district and instantly see the top origin→destination pairs driving traffic through it — ranked by volume, broken down by route type, and smoothed over time with the Average mode.
+
+[b]Breakdown Revisited[/b] is a community revival of the original [b]Breakdown[/b] by [url=https://github.com/whyoh]whyoh[/url], updated and extended for Cities: Skylines 1.17+.
+
+[b]► Source code & changelog:[/b]
+[url=https://github.com/roberto-naharro/CitiesBreakdown]github.com/roberto-naharro/CitiesBreakdown[/url]
+
+[h1]What it shows[/h1]
+
+[list]
+[*][b]Route popup[/b] — open any WorldInfoPanel (building, road, vehicle, citizen…) to see the top-25 district pairs generating traffic through that entity
+[*][b]City-wide accordion[/b] — in Traffic Routes mode, an expandable panel lists every district ranked by total connections, with per-connection breakdowns
+[*][b]Route type breakdown[/b] — hover any row for a tooltip showing the split between Pedestrians, Cyclists, Private Cars, Trucks, Public Transit, and City Services
+[*][b]Districts or road segments[/b] — toggle the display between district-level and road-segment-level origin/destination pairs
+[*][b]Average mode[/b] — switch from live snapshot to an exponential moving average (EMA) of traffic shares accumulated over the session; smooths out traffic spikes and shows longer-term patterns
+[*][b]Percentage display[/b] — Average mode shows each pair's share of total city traffic (e.g. 12.3%) with colour-coded alerts for high-traffic corridors
+[/list]
+
+[h1]How to use[/h1]
+
+[list]
+[*]Enable [b]Traffic Routes[/b] (the route-visualisation overlay) in the game's info view
+[*]Click any entity — a panel appears to the right listing the top routes
+[*]Use [b]Districts[/b] / [b]Roads[/b] buttons to switch display mode
+[*]After a few minutes of play, the [b]Average[/b] button unlocks — click it for smoothed historical data
+[*]For a city-wide overview, open [b]Traffic Routes[/b] without clicking anything — the accordion panel appears at the bottom
+[/list]
+
+[h1]Compatibility[/h1]
+
+Compatible with [b]Cities: Skylines 1.17+[/b]. No Harmony dependency — uses only the standard ICities API and reflection. Should be compatible with most traffic and UI mods.
+
+[b]No known conflicts.[/b] If you find one, please report it on the GitHub issues page.
+
+[h1]Source Code & Credits[/h1]
+
+[url=https://github.com/roberto-naharro/CitiesBreakdown]► Breakdown Revisited on GitHub[/url]
+[url=https://github.com/whyoh/CitiesBreakdown]► Original Breakdown by whyoh[/url]
+
+[b]whyoh[/b] — original mod concept, route-walking logic, and UI layout.
+[b]roberto-naharro[/b] — revival, city-wide accordion panel, Average/EMA mode, route-type tooltips, and ongoing maintenance.

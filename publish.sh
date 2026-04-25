@@ -29,8 +29,8 @@ fi
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 APP_ID="255710"
-ITEM_ID="${WORKSHOP_ITEM_ID:-}"   # set WORKSHOP_ITEM_ID in .env once published
-MOD_NAME="Breakdown"
+ITEM_ID="${WORKSHOP_ITEM_ID:-0}"  # "0" = first publish; steamcmd assigns a new ID
+MOD_NAME="BreakdownRevisited"
 DIST="$SCRIPT_DIR/dist/$MOD_NAME"
 WORKSHOP_DIR="$SCRIPT_DIR/Workshop"
 VDF="$WORKSHOP_DIR/item.vdf"
@@ -50,10 +50,9 @@ if [[ -z "$STEAM_USERNAME" ]]; then
     exit 1
 fi
 
-if [[ -z "$ITEM_ID" ]]; then
-    echo "ERROR: WORKSHOP_ITEM_ID is not set."
-    echo "  Add it to your .env file after the first Workshop publish."
-    exit 1
+if [[ "$ITEM_ID" == "0" ]]; then
+    echo "NOTE: WORKSHOP_ITEM_ID is not set — this will create a NEW Workshop item."
+    echo "  After steamcmd prints the item ID, add it to .env:  WORKSHOP_ITEM_ID=<id>"
 fi
 
 if [[ ! -f "$DIST/$MOD_NAME.dll" ]]; then
@@ -72,8 +71,9 @@ cat > "$VDF" <<EOF
     "publishedfileid" "$ITEM_ID"
     "contentfolder"   "$DIST"
     "previewfile"     "$WORKSHOP_DIR/PreviewImage.png"
+    "descriptionfile" "$WORKSHOP_DIR/description.txt"
     "visibility"      "0"
-    "title"           "Breakdown"
+    "title"           "Breakdown Revisited"
     "changenote"      "$CHANGE_NOTE"
 }
 EOF
@@ -93,4 +93,8 @@ steamcmd \
 
 echo ""
 echo "Done. Check the Workshop page:"
-echo "  https://steamcommunity.com/sharedfiles/filedetails/?id=$ITEM_ID"
+if [[ "$ITEM_ID" != "0" ]]; then
+    echo "  https://steamcommunity.com/sharedfiles/filedetails/?id=$ITEM_ID"
+else
+    echo "  Check steamcmd output above for the new item ID, then add to .env:  WORKSHOP_ITEM_ID=<id>"
+fi
