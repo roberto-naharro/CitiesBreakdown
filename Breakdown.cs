@@ -381,17 +381,25 @@ namespace Breakdown
                     }
                     if (_cityWideRefreshFrame++ % 300 == 0 && !_findCityWideRoutesPending)
                     {
-                        var capturedPaths2 = paths;
-                        var capturedAvg2   = _showAverage;
+                        var capturedPaths2  = paths;
+                        var capturedAvg2    = _showAverage;
+                        var capturedFilter  = GetActiveCategories(viz);
                         _findCityWideRoutesPending = true;
                         Log.Debug($"Queuing city-wide AddAction, showAverage={capturedAvg2}");
                         if (_accordionPanel != null) _accordionPanel.ShowLoading();
-                        SimulationManager.instance.AddAction(() => FindCityWideRoutesOnSimThread(capturedPaths2, capturedAvg2));
+                        SimulationManager.instance.AddAction(() => FindCityWideRoutesOnSimThread(capturedPaths2, capturedAvg2, capturedFilter));
                     }
                 }
-                else if (_accordionPanel != null)
+                else
                 {
-                    _accordionPanel.isVisible = false;
+                    if (_accordionPanel != null) _accordionPanel.isVisible = false;
+                    // Always consume so SetAverageAvailable fires even when a popup is open
+                    if (_pendingCityWideResultReady)
+                    {
+                        _pendingCityWideResultReady = false;
+                        if (_pendingCityWideUIUpdate != null) _pendingCityWideUIUpdate();
+                        _findCityWideRoutesPending = false;
+                    }
                 }
                 _wasPopupOpen = !noPopupOpen;
             }
@@ -485,6 +493,21 @@ namespace Breakdown
                 }
             }
             Log.Debug($"Route labels: {_labelPedestrian} | {_labelCyclists} | {_labelPrivate} | {_labelTrucks} | {_labelPublicTrans} | {_labelServices}");
+        }
+
+        // Returns null when all categories are active (no filtering needed),
+        // or bool[6] = {ped, cyc, priv, trk, pub, svc} when at least one is unchecked.
+        private static bool[] GetActiveCategories(PathVisualizer viz)
+        {
+            if (viz == null) return null;
+            bool ped  = viz.showPedestrians;
+            bool cyc  = viz.showCyclists;
+            bool priv = viz.showPrivateVehicles;
+            bool trk  = viz.showTrucks;
+            bool pub  = viz.showPublicTransport;
+            bool svc  = viz.showCityServiceVehicles;
+            if (ped && cyc && priv && trk && pub && svc) return null;
+            return new bool[] { ped, cyc, priv, trk, pub, svc };
         }
 
         private void InitAccordionUI()
@@ -680,9 +703,9 @@ namespace Breakdown
             _pendingResultReady = true;
         }
 
-        private void FindCityWideRoutesOnSimThread(Dictionary<InstanceID, PathVisualizer.Path> pathDict, bool showAverage)
+        private void FindCityWideRoutesOnSimThread(Dictionary<InstanceID, PathVisualizer.Path> pathDict, bool showAverage, bool[] activeCategories)
         {
-            try { FindCityWideRoutesOnSimThreadInner(pathDict, showAverage); }
+            try { FindCityWideRoutesOnSimThreadInner(pathDict, showAverage, activeCategories); }
             catch (Exception ex)
             {
                 Log.Info($"FindCityWideRoutesOnSimThread exception: {ex.Message}");
@@ -690,7 +713,7 @@ namespace Breakdown
             }
         }
 
-        private void FindCityWideRoutesOnSimThreadInner(Dictionary<InstanceID, PathVisualizer.Path> pathDict, bool showAverage)
+        private void FindCityWideRoutesOnSimThreadInner(Dictionary<InstanceID, PathVisualizer.Path> pathDict, bool showAverage, bool[] activeCategories)
         {
             Log.Debug("FindCityWideRoutes start");
 
@@ -739,7 +762,7 @@ namespace Breakdown
 
             UpdateEma();
 
-            var sections = showAverage ? BuildDistrictSectionsEma() : BuildDistrictSections();
+            var sections = showAverage ? BuildDistrictSectionsEma(activeCategories) : BuildDistrictSections(activeCategories);
             Log.Debug($"FindCityWideRoutes done, {sections.Length} sections, showAverage={showAverage}");
 
             bool hasEmaData = _accumulated.Count > 0;
@@ -863,7 +886,7 @@ namespace Breakdown
             }
         }
 
-        private DistrictSection[] BuildDistrictSections()
+        private DistrictSection[] BuildDistrictSections(bool[] active)
         {
             var totals      = new Dictionary<string, uint>();
             var connections = new Dictionary<string, List<ConnectionData>>();
@@ -888,9 +911,6 @@ namespace Breakdown
                     Dictionary<string, PathDetails> bDict;
                     if (this.pathCounts.TryGetValue(b, out bDict)) bDict.TryGetValue(a, out dBA);
 
-                    uint n = dAB.refs + (dBA != null ? dBA.refs : 0);
-                    if (n == 0) continue;
-
                     uint catPed  = dAB.catPedestrian + (dBA != null ? dBA.catPedestrian : 0);
                     uint catCyc  = dAB.catCyclists   + (dBA != null ? dBA.catCyclists   : 0);
                     uint catPriv = dAB.catPrivate     + (dBA != null ? dBA.catPrivate    : 0);
@@ -898,7 +918,30 @@ namespace Breakdown
                     uint catPub  = dAB.catPublic      + (dBA != null ? dBA.catPublic     : 0);
                     uint catSvc  = dAB.catServices    + (dBA != null ? dBA.catServices   : 0);
 
-                    string tip = BuildConnectionTooltip(catPed, catCyc, catPriv, catTrk, catPub, catSvc);
+                    uint n;
+                    if (active == null)
+                    {
+                        n = dAB.refs + (dBA != null ? dBA.refs : 0);
+                    }
+                    else
+                    {
+                        n = 0;
+                        if (active[0]) n += catPed;
+                        if (active[1]) n += catCyc;
+                        if (active[2]) n += catPriv;
+                        if (active[3]) n += catTrk;
+                        if (active[4]) n += catPub;
+                        if (active[5]) n += catSvc;
+                    }
+                    if (n == 0) continue;
+
+                    string tip = BuildConnectionTooltip(
+                        active == null || active[0] ? catPed  : 0,
+                        active == null || active[1] ? catCyc  : 0,
+                        active == null || active[2] ? catPriv : 0,
+                        active == null || active[3] ? catTrk  : 0,
+                        active == null || active[4] ? catPub  : 0,
+                        active == null || active[5] ? catSvc  : 0);
 
                     if (!totals.ContainsKey(a)) { totals[a] = 0; connections[a] = new List<ConnectionData>(); }
                     if (!totals.ContainsKey(b)) { totals[b] = 0; connections[b] = new List<ConnectionData>(); }
@@ -973,7 +1016,8 @@ namespace Breakdown
             // reading pathCounts / _accumulated on the main thread is safe here.
             if (_accordionPanel != null && !_findCityWideRoutesPending)
             {
-                var sections = _showAverage ? BuildDistrictSectionsEma() : BuildDistrictSections();
+                var filter   = GetActiveCategories(Singleton<PathVisualizer>.instance);
+                var sections = _showAverage ? BuildDistrictSectionsEma(filter) : BuildDistrictSections(filter);
                 _accordionPanel.SetData(sections);
             }
         }
@@ -1013,7 +1057,19 @@ namespace Breakdown
             }
             rows.Sort((a, b) => b.entry.ema.CompareTo(a.entry.ema));
 
-            string avgTotalText = $"Tracking {rows.Count} pairs (avg)";
+            // When a district is selected, show percentages relative to that district's total
+            // traffic share rather than the city-wide share, so rows sum to ~100%.
+            double districtTotal = 1.0;
+            if (selectedDistrict != null && rows.Count > 0)
+            {
+                double sum = 0;
+                foreach (var r in rows) sum += r.entry.ema;
+                if (sum > 0) districtTotal = sum;
+            }
+
+            string avgTotalText = selectedDistrict != null
+                ? $"Tracking {rows.Count} connections (avg)"
+                : $"Tracking {rows.Count} pairs (avg)";
             int take = Math.Min(rows.Count, 25);
             var prefixes    = new string[take];
             var froms       = new string[take];
@@ -1029,7 +1085,9 @@ namespace Breakdown
             for (int i = 0; i < take; i++)
             {
                 var row   = rows[i];
-                double pct = row.entry.ema * 100.0;
+                double pct = selectedDistrict != null
+                    ? (row.entry.ema / districtTotal) * 100.0
+                    : row.entry.ema * 100.0;
                 var fmt    = FormatRouteRow(row.from, row.to, selectedDistrict);
                 prefixes[i]    = fmt.prefix;
                 froms[i]       = fmt.from;
@@ -1178,7 +1236,7 @@ namespace Breakdown
             Log.Debug($"UpdateEma: {_accumulated.Count} pa-keys, grandTotal={grandTotal:F0}");
         }
 
-        private DistrictSection[] BuildDistrictSectionsEma()
+        private DistrictSection[] BuildDistrictSectionsEma(bool[] active)
         {
             var totals      = new Dictionary<string, double>();
             var connections = new Dictionary<string, List<ConnectionData>>();
@@ -1188,13 +1246,31 @@ namespace Breakdown
                 string pa = paKv.Key;
                 foreach (var pbKv in paKv.Value)
                 {
-                    string   pb      = pbKv.Key;
+                    string   pb = pbKv.Key;
                     if (pa == pb) continue;  // same-district pairs don't appear in the accordion
-                    EmaEntry e       = pbKv.Value;
-                    double   pct     = e.ema * 100.0;
-                    string   disp    = $"({FormatPct(pct)}%)";
-                    uint     sortKey = (uint)Math.Round(e.ema * 1000000);
-                    string   tip     = BuildConnectionTooltipEma(e);
+                    EmaEntry e  = pbKv.Value;
+
+                    double filteredEma;
+                    if (active == null)
+                    {
+                        filteredEma = e.ema;
+                    }
+                    else
+                    {
+                        filteredEma = 0;
+                        if (active[0]) filteredEma += e.ema * e.emaCatPedestrian;
+                        if (active[1]) filteredEma += e.ema * e.emaCatCyclists;
+                        if (active[2]) filteredEma += e.ema * e.emaCatPrivate;
+                        if (active[3]) filteredEma += e.ema * e.emaCatTrucks;
+                        if (active[4]) filteredEma += e.ema * e.emaCatPublic;
+                        if (active[5]) filteredEma += e.ema * e.emaCatServices;
+                    }
+                    if (filteredEma < 0.0001) continue;
+
+                    double pct     = filteredEma * 100.0;
+                    string disp    = $"({FormatPct(pct)}%)";
+                    uint   sortKey = (uint)Math.Round(filteredEma * 1000000);
+                    string tip     = BuildConnectionTooltipEma(e);
 
                     if (!totals.ContainsKey(pa)) { totals[pa] = 0; connections[pa] = new List<ConnectionData>(); }
                     if (!totals.ContainsKey(pb)) { totals[pb] = 0; connections[pb] = new List<ConnectionData>(); }

@@ -116,7 +116,9 @@ namespace Breakdown
             _averageButton.autoSize          = true;
             _averageButton.canFocus          = false;
             _averageButton.textPadding       = new RectOffset(8, 8, 4, 4);
-            _averageButton.isEnabled         = false;  // disabled until EMA data is available
+            _averageButton.isEnabled          = false;  // disabled until EMA data is available
+            _averageButton.disabledTextColor  = new Color32(90, 90, 90, 255);
+            _averageButton.tooltip            = "Not enough data yet";
             _averageButton.eventClick += (c, e) =>
             {
                 if (_showAverage) return;  // already active tab — do nothing
@@ -212,7 +214,9 @@ namespace Breakdown
 
         public void SetAverageAvailable(bool available)
         {
-            if (_averageButton != null) _averageButton.isEnabled = available;
+            if (_averageButton == null) return;
+            _averageButton.isEnabled = available;
+            _averageButton.tooltip   = available ? string.Empty : "Not enough data yet";
         }
 
         public void SetTopTen(string[] prefixes, string[] froms, Color32[] fromColors,
