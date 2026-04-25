@@ -10,6 +10,7 @@ namespace Breakdown
 
         private UIButton _districtsButton;
         private UIButton _roadsButton;
+        private UIButton _averageButton;
 
         private UIPanel[]  _rows;
         private UILabel[]  _prefixLabels;
@@ -20,8 +21,10 @@ namespace Breakdown
         private UILabel[]  _countLabels;
 
         private bool _districtsMode = true;
+        private bool _showAverage  = false;
 
         public Action OnModeToggled;
+        public Action OnAverageToggled;
 
         public override void Awake()
         {
@@ -65,10 +68,14 @@ namespace Breakdown
             _districtsButton.textPadding = new RectOffset(8, 8, 4, 4);
             _districtsButton.eventClick += (c, e) =>
             {
-                if (_districtsMode) return;
-                _districtsMode = true;
+                if (_districtsMode && !_showAverage) return;  // already active tab
+                if (_showAverage && OnAverageToggled != null) OnAverageToggled();  // deactivate Average
+                if (!_districtsMode)  // mode change needed (was on Roads)
+                {
+                    _districtsMode = true;
+                    if (OnModeToggled != null) OnModeToggled();
+                }
                 UpdateToggleState();
-                if (OnModeToggled != null) OnModeToggled();
             };
 
             _roadsButton = header.AddUIComponent<UIButton>();
@@ -85,10 +92,34 @@ namespace Breakdown
             _roadsButton.textPadding = new RectOffset(8, 8, 4, 4);
             _roadsButton.eventClick += (c, e) =>
             {
-                if (!_districtsMode) return;
-                _districtsMode = false;
+                if (!_districtsMode && !_showAverage) return;  // already active tab
+                if (_showAverage && OnAverageToggled != null) OnAverageToggled();  // deactivate Average
+                if (_districtsMode)  // mode change needed (was on Districts)
+                {
+                    _districtsMode = false;
+                    if (OnModeToggled != null) OnModeToggled();
+                }
                 UpdateToggleState();
-                if (OnModeToggled != null) OnModeToggled();
+            };
+
+            _averageButton = header.AddUIComponent<UIButton>();
+            _averageButton.text              = "Average";
+            _averageButton.textScale         = BreakdownStyle.TextScale;
+            _averageButton.textColor         = BreakdownStyle.MutedColor;
+            _averageButton.hoveredTextColor  = BreakdownStyle.ActiveColor;
+            _averageButton.normalBgSprite    = "";
+            _averageButton.hoveredBgSprite   = "ButtonSmallHovered";
+            _averageButton.pressedBgSprite   = "ButtonSmallPressed";
+            _averageButton.focusedBgSprite   = "";
+            _averageButton.autoSize          = true;
+            _averageButton.canFocus          = false;
+            _averageButton.textPadding       = new RectOffset(8, 8, 4, 4);
+            _averageButton.isEnabled         = false;  // disabled until EMA data is available
+            _averageButton.eventClick += (c, e) =>
+            {
+                if (_showAverage) return;  // already active tab — do nothing
+                if (OnAverageToggled != null) OnAverageToggled();
+                // UpdateAverageState(true) will be called by ToggleAverageMode to sync visuals
             };
 
             // ── Data rows ────────────────────────────────────────────────────
@@ -146,12 +177,31 @@ namespace Breakdown
         private void UpdateToggleState()
         {
             if (_districtsButton == null) return;
-            _districtsButton.textColor       = _districtsMode ? BreakdownStyle.ActiveColor : BreakdownStyle.MutedColor;
-            _districtsButton.normalBgSprite  = _districtsMode ? "ButtonSmall" : "";
-            _districtsButton.focusedBgSprite = _districtsMode ? "ButtonSmall" : "";
-            _roadsButton.textColor           = _districtsMode ? BreakdownStyle.MutedColor  : BreakdownStyle.ActiveColor;
-            _roadsButton.normalBgSprite      = _districtsMode ? "" : "ButtonSmall";
-            _roadsButton.focusedBgSprite     = _districtsMode ? "" : "ButtonSmall";
+            bool showDist  = _districtsMode  && !_showAverage;
+            bool showRoads = !_districtsMode && !_showAverage;
+            _districtsButton.textColor       = showDist  ? BreakdownStyle.ActiveColor : BreakdownStyle.MutedColor;
+            _districtsButton.normalBgSprite  = showDist  ? "ButtonSmall" : "";
+            _districtsButton.focusedBgSprite = showDist  ? "ButtonSmall" : "";
+            _roadsButton.textColor           = showRoads ? BreakdownStyle.ActiveColor : BreakdownStyle.MutedColor;
+            _roadsButton.normalBgSprite      = showRoads ? "ButtonSmall" : "";
+            _roadsButton.focusedBgSprite     = showRoads ? "ButtonSmall" : "";
+            if (_averageButton != null)
+            {
+                _averageButton.textColor       = _showAverage ? BreakdownStyle.ActiveColor : BreakdownStyle.MutedColor;
+                _averageButton.normalBgSprite  = _showAverage ? "ButtonSmall" : "";
+                _averageButton.focusedBgSprite = _showAverage ? "ButtonSmall" : "";
+            }
+        }
+
+        public void UpdateAverageState(bool isAverage)
+        {
+            _showAverage = isAverage;
+            UpdateToggleState();
+        }
+
+        public void SetAverageAvailable(bool available)
+        {
+            if (_averageButton != null) _averageButton.isEnabled = available;
         }
 
         public void SetTopTen(string[] prefixes, string[] froms, Color32[] fromColors,

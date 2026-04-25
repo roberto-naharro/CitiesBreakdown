@@ -9,6 +9,7 @@ namespace Breakdown
         public string         name;
         public Color32        color;
         public uint           totalRoutes;
+        public string         displayTotal;   // if non-null: replaces "(N routes)" in header
         public ConnectionData[] connections;
     }
 
@@ -18,6 +19,7 @@ namespace Breakdown
         public Color32 color;
         public uint    routes;
         public string  tooltip;
+        public string  displayRoutes;  // if non-null: replaces "(N)" in connection row
     }
 
     public class UIBreakdownAccordionPanel : UIPanel
@@ -25,6 +27,9 @@ namespace Breakdown
         public const int MaxSections    = 12;
         public const int MaxConnections = 8;
 
+        public Action OnAverageToggled;
+
+        private UIButton    _averageButton;
         private UILabel     _loadingLabel;
         private UIPanel[]   _sections;
         private UIPanel[]   _headers;
@@ -58,6 +63,30 @@ namespace Breakdown
             this.autoFitChildrenHorizontally = true;
             this.autoFitChildrenVertically   = true;
             this.name                        = "BreakdownAccordionPanel";
+
+            // ── Average / Live toggle header ─────────────────────────────────
+            var topHeader = this.AddUIComponent<UIPanel>();
+            topHeader.autoLayout          = true;
+            topHeader.autoLayoutDirection = LayoutDirection.Horizontal;
+            topHeader.autoFitChildrenHorizontally = true;
+            topHeader.autoFitChildrenVertically   = true;
+
+            _averageButton = topHeader.AddUIComponent<UIButton>();
+            _averageButton.text              = "Average";
+            _averageButton.textScale         = BreakdownStyle.TextScale;
+            _averageButton.textColor         = BreakdownStyle.MutedColor;
+            _averageButton.hoveredTextColor  = BreakdownStyle.ActiveColor;
+            _averageButton.normalBgSprite    = "";
+            _averageButton.hoveredBgSprite   = "ButtonSmallHovered";
+            _averageButton.pressedBgSprite   = "ButtonSmallPressed";
+            _averageButton.focusedBgSprite   = "";
+            _averageButton.autoSize          = true;
+            _averageButton.canFocus          = false;
+            _averageButton.textPadding       = new RectOffset(8, 8, 4, 4);
+            _averageButton.eventClick += (c, e) =>
+            {
+                if (OnAverageToggled != null) OnAverageToggled();
+            };
 
             _loadingLabel = this.AddUIComponent<UILabel>();
             _loadingLabel.text       = "Loading...";
@@ -185,6 +214,14 @@ namespace Breakdown
             }
         }
 
+        public void UpdateAverageState(bool isAverage)
+        {
+            if (_averageButton == null) return;
+            _averageButton.textColor       = isAverage ? BreakdownStyle.ActiveColor : BreakdownStyle.MutedColor;
+            _averageButton.normalBgSprite  = isAverage ? "ButtonSmall" : "";
+            _averageButton.focusedBgSprite = isAverage ? "ButtonSmall" : "";
+        }
+
         public void ShowLoading()
         {
             if (_loadingLabel == null) return;
@@ -216,7 +253,8 @@ namespace Breakdown
 
                     _headerNames[i].text      = s.name;
                     _headerNames[i].textColor = s.color;
-                    _headerCounts[i].text     = s.totalRoutes == 1 ? "(1 route)" : $"({s.totalRoutes} routes)";
+                    _headerCounts[i].text     = s.displayTotal != null ? s.displayTotal
+                        : (s.totalRoutes == 1 ? "(1 route)" : $"({s.totalRoutes} routes)");
                     _arrows[i].text           = expanded ? "▼" : "▶";
 
                     int connCount = s.connections != null ? Math.Min(s.connections.Length, MaxConnections) : 0;
@@ -227,7 +265,8 @@ namespace Breakdown
                             var c = s.connections[j];
                             _connNames[i][j].text      = c.name;
                             _connNames[i][j].textColor = c.color;
-                            _connCounts[i][j].text     = c.routes == 1 ? "(1)" : $"({c.routes})";
+                            _connCounts[i][j].text     = c.displayRoutes != null ? c.displayRoutes
+                                : (c.routes == 1 ? "(1)" : $"({c.routes})");
                             _connRows[i][j].tooltip    = c.tooltip ?? string.Empty;
                             _connRows[i][j].isVisible  = true;
                         }
