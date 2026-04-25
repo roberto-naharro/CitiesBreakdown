@@ -35,7 +35,7 @@ Click any building, road, vehicle, or district while the Traffic Routes overlay 
 
 ## Compatibility
 
-- Cities: Skylines **1.17+** (1.x only; CS2 not supported)
+- Cities: Skylines **1.21.1-f9** (1.x only; CS2 not supported)
 - No Harmony dependency — uses only the standard ICities API and reflection
 - No known conflicts
 

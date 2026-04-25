@@ -2,7 +2,7 @@
 
 See where your city's traffic actually comes from. Click any building, road, vehicle, or district and instantly see the top origin→destination pairs driving traffic through it — ranked by volume, broken down by route type, and smoothed over time with the Average mode.
 
-[b]Breakdown Revisited[/b] is a community revival of the original [b]Breakdown[/b] by [url=https://github.com/whyoh]whyoh[/url], updated and extended for Cities: Skylines 1.17+.
+[b]Breakdown Revisited[/b] is a community revival of the original [b]Breakdown[/b] by [url=https://github.com/whyoh]whyoh[/url], updated and extended for Cities: Skylines 1.21.1-f9.
 
 [b]► Source code & changelog:[/b]
 [url=https://github.com/roberto-naharro/CitiesBreakdown]github.com/roberto-naharro/CitiesBreakdown[/url]
@@ -30,7 +30,7 @@ See where your city's traffic actually comes from. Click any building, road, veh
 
 [h1]Compatibility[/h1]
 
-Compatible with [b]Cities: Skylines 1.17+[/b]. No Harmony dependency — uses only the standard ICities API and reflection. Should be compatible with most traffic and UI mods.
+Compatible with [b]Cities: Skylines 1.21.1-f9[/b] and later 1.x. No Harmony dependency — uses only the standard ICities API and reflection. Should be compatible with most traffic and UI mods.
 
 [b]No known conflicts.[/b] If you find one, please report it on the GitHub issues page.
 
