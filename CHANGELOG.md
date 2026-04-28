@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/roberto-naharro/CitiesBreakdown/compare/v1.1.0...v1.2.0) (2026-04-28)
+
+
+### Features
+
+* implement stable district color palette and improve district ID management ([6214e6a](https://github.com/roberto-naharro/CitiesBreakdown/commit/6214e6a51fc4157313162b52b73f29e3f3542a10))
+
 ## [1.1.0](https://github.com/roberto-naharro/CitiesBreakdown/compare/v1.0.1...v1.1.0) (2026-04-25)
 
 
