@@ -32,13 +32,13 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>/mnt/cities_skylines/Cities_Data/Managed/Assembly-CSharp.dll</HintPath>
+      <HintPath>.\GameReferences\Assembly-CSharp.dll</HintPath>
     </Reference>
     <Reference Include="ColossalManaged">
-      <HintPath>/mnt/cities_skylines/Cities_Data/Managed/ColossalManaged.dll</HintPath>
+      <HintPath>.\GameReferences\ColossalManaged.dll</HintPath>
     </Reference>
     <Reference Include="ICities">
-      <HintPath>/mnt/cities_skylines/Cities_Data/Managed/ICities.dll</HintPath>
+      <HintPath>.\GameReferences\ICities.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -47,7 +47,7 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
     <Reference Include="UnityEngine">
-      <HintPath>/mnt/cities_skylines/Cities_Data/Managed/UnityEngine.dll</HintPath>
+      <HintPath>.\GameReferences\UnityEngine.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

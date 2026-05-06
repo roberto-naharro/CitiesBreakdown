@@ -1,5 +1,6 @@
 bin/
 obj/
+dist/
 .env
 Workshop/item.vdf
 *.user

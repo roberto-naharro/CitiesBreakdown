@@ -4,23 +4,18 @@ name: Deploy to Steam Workshop
 #   1. Automatically — when Release Please creates a tag (v*) after merging a release PR
 #   2. Manually     — Actions → "Deploy to Steam Workshop" → Run workflow
 #
-# The workflow does NOT build the mod — it publishes the pre-staged dist/ folder.
-# Before merging a Release PR, run ./deploy.sh --release locally and commit dist/.
+# Builds the mod from source in CI. Game reference DLLs are in GameReferences/.
+# No pre-built dist/ commit needed — CI handles the full build + deploy.
 #
-# The change note sent to Steam Workshop is extracted automatically from CHANGELOG.md
-# for the current version, with a link to the full GitHub Release appended.
+# Required secrets (environment: PRO):
+#   STEAM_CONFIG_VDF      — base64-encoded ~/.steam/steamcmd/config/config.vdf
+#   STEAM_USERNAME        — Steam username
+#   WORKSHOP_ITEM_ID      — Workshop item ID
+#   RELEASE_PLEASE_TOKEN  — PAT with repo scope (so tag push triggers this workflow)
 #
-# One-time setup (do this once, then forget):
-#   1. sudo apt-get install steamcmd
-#   2. steamcmd +login YOUR_USERNAME +quit   (complete the Steam Guard prompt)
-#   3. base64 ~/.steam/steamcmd/config/config.vdf   → copy the output
-#   4. Add GitHub secret  STEAM_CONFIG_VDF   with that base64 string
-#   5. Add GitHub secret  STEAM_USERNAME     with your Steam username
-#   6. Add GitHub secret  WORKSHOP_ITEM_ID   with the Workshop item ID
-#   7. Add GitHub secret  RELEASE_PLEASE_TOKEN  (PAT with repo scope)
-#
-# If publishing fails with an auth error, repeat steps 2–4 to refresh the session
-# (Steam sessions expire after ~1 year or when you log in from a new device).
+# If publishing fails with an auth error, refresh the session:
+#   steamcmd +login YOUR_USERNAME +quit   (complete Steam Guard)
+#   base64 ~/.steam/steamcmd/config/config.vdf   → update STEAM_CONFIG_VDF secret
 
 on:
   push:
@@ -42,47 +37,54 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify dist folder exists
+      - name: Install Mono
         run: |
-          if [[ ! -f "dist/BreakdownRevisited/BreakdownRevisited.dll" ]]; then
-            echo "ERROR: dist/BreakdownRevisited/BreakdownRevisited.dll not found."
-            echo "Run ./deploy.sh --release locally, commit dist/, then push."
-            exit 1
+          sudo apt-get update
+          sudo apt-get install -y mono-complete mono-xbuild
+
+      - name: Inject version into AssemblyInfo.cs
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          if [[ -z "$VERSION" || "$VERSION" == "$TAG" ]]; then
+            VERSION=$(python3 -c "import json; print(json.load(open('.release-please-manifest.json'))['.'])")
           fi
+          echo "Building version: $VERSION"
+          sed -i "s/\[assembly: AssemblyVersion(\"[^\"]*\")\]/[assembly: AssemblyVersion(\"$VERSION.0\")]/" Properties/AssemblyInfo.cs
+
+      - name: Build
+        run: xbuild Breakdown.sln /p:Configuration=Release /nologo /verbosity:quiet
+
+      - name: Stage dist/
+        run: |
+          mkdir -p dist/BreakdownRevisited
+          cp bin/Release/BreakdownRevisited.dll dist/BreakdownRevisited/
           echo "dist/ contents:"
           ls -lh dist/BreakdownRevisited/
 
       - name: Build change note from CHANGELOG.md
         id: note
         run: |
-          # Use manual override if provided
           MANUAL_NOTE="${{ github.event.inputs.changeNote }}"
           if [[ -n "$MANUAL_NOTE" ]]; then
             echo "value=$MANUAL_NOTE" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          # Derive version from the tag (strip leading 'v')
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
-
-          # Fall back to the version in the manifest when triggered manually without a tag
           if [[ -z "$VERSION" || "$VERSION" == "$TAG" ]]; then
-            VERSION=$(python3 -c "import json,sys; print(json.load(open('.release-please-manifest.json'))['.'])")
+            VERSION=$(python3 -c "import json; print(json.load(open('.release-please-manifest.json'))['.'])")
           fi
 
-          # Extract the section for this version from CHANGELOG.md.
-          # Collects everything between "## [VERSION]" and the next "## [" heading.
           SECTION=$(awk \
             "/^## \[$VERSION\]/{found=1; next} \
              found && /^## \[/{exit} \
              found{print}" \
             CHANGELOG.md \
-            | sed '/^[[:space:]]*$/d')  # strip blank lines at start/end
+            | sed '/^[[:space:]]*$/d')
 
-          # Convert the Markdown section to Steam BBCode.
           BBCODE=$(echo "$SECTION" | python3 Workshop/md_to_bbcode.py)
-
           RELEASE_URL="https://github.com/${{ github.repository }}/releases/tag/v${VERSION}"
 
           if [[ -n "$BBCODE" ]]; then
@@ -91,10 +93,7 @@ jobs:
             NOTE="Release ${VERSION} - [url=${RELEASE_URL}]${RELEASE_URL}[/url]"
           fi
 
-          # Steam Workshop change notes are capped at ~8 000 chars
           NOTE="${NOTE:0:8000}"
-
-          # Write multiline value to GITHUB_OUTPUT
           {
             echo "value<<__EOF__"
             echo "$NOTE"
@@ -114,7 +113,6 @@ jobs:
           mkdir -p "$HOME/steamcmd"
           curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" \
             | tar -xz -C "$HOME/steamcmd"
-          # Initialize and self-update
           "$HOME/steamcmd/steamcmd.sh" +quit || true
           echo "$HOME/steamcmd" >> "$GITHUB_PATH"
 
@@ -122,11 +120,9 @@ jobs:
         env:
           STEAM_CONFIG_VDF: ${{ secrets.STEAM_CONFIG_VDF }}
         run: |
-          # steamcmd stores its data in ~/Steam when run from a custom directory
           STEAMROOT="$HOME/Steam"
           mkdir -p "$STEAMROOT/config"
           echo "$STEAM_CONFIG_VDF" | base64 -d > "$STEAMROOT/config/config.vdf"
-          # Also place it where steamcmd looks via the .steam symlink
           mkdir -p "$HOME/.steam"
           ln -sfn "$STEAMROOT" "$HOME/.steam/steam"
           ln -sfn "$STEAMROOT" "$HOME/.steam/root"
@@ -138,7 +134,6 @@ jobs:
           CHANGE_NOTE: ${{ steps.note.outputs.value }}
         run: |
           python3 Workshop/generate_vdf.py
-
           steamcmd.sh \
             +login "$STEAM_USERNAME" \
             +workshop_build_item /tmp/item.vdf \
