@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/roberto-naharro/CitiesBreakdown/compare/v1.2.0...v1.3.0) (2026-05-06)
+
+
+### Features
+
+* update CI workflow for Steam Workshop deployment and adjust project references ([391638e](https://github.com/roberto-naharro/CitiesBreakdown/commit/391638ea23f51fcb931219237d2713c2ac1b2f32))
+
 ## [1.2.0](https://github.com/roberto-naharro/CitiesBreakdown/compare/v1.1.0...v1.2.0) (2026-04-28)
 
 
